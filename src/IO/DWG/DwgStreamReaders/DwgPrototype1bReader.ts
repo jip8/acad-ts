@@ -24,6 +24,7 @@ interface SegmentHeader {
 	objectDataAlignmentOffset: number;
 }
 interface SegmentEntry { offset: number; size: number }
+interface DataIndexEntry { segmentIndex: number; localOffset: number; schemaIndex: number }
 interface SchemaPointer { index: number; segmentIndex: number; localOffset: number }
 interface SchemaIndex { header: SegmentHeader; schemaPointers: SchemaPointer[]; propertyPointers: SchemaPointer[]; names: string[] }
 
@@ -32,6 +33,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 	private _fileHeader!: FileHeader;
 	private _segments: SegmentEntry[] = [];
 	private _schemaIndex!: SchemaIndex;
+	private _dataIndex: DataIndexEntry[] = [];
 
 	constructor(version: ACadVersion, private readonly _builder: DwgDocumentBuilder, private readonly _reader: IDwgStreamReader) {
 		super(version);
@@ -44,6 +46,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			this._readFileSegmentIndex();
 			this._schemaIndex = this._readSchemaIndex();
 			this._readSchemaData(storage);
+			this._readDataIndex();
 			this._builder.dataStorage = storage;
 		} catch (error) {
 			if (!this._builder.configuration.failsafe) throw error;
@@ -203,5 +206,19 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			for (let i = 0; i < count; i++) record.values.push(this._bytes(record.typeSize));
 		}
 		return record;
+	}
+
+	private _readDataIndex(): void {
+		this._seek(this._segmentOffset(this._fileHeader.dataIndexSegmentIndex));
+		this._readSegmentHeader();
+		const count = this._uint();
+		this._uint();
+		this._requireBytes(count * 12);
+		for (let i = 0; i < count; i++) {
+			const segmentIndex = this._uint();
+			const localOffset = this._uint();
+			const schemaIndex = this._uint();
+			if (segmentIndex !== 0) this._dataIndex.push({ segmentIndex, localOffset, schemaIndex });
+		}
 	}
 }
