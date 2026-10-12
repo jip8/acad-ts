@@ -1,9 +1,9 @@
 # ACadSharp upstream synchronization
 
 - Original port baseline: [3010994939c1bc21df0c9e2931e9baee4564815a](https://github.com/DomCR/ACadSharp/commit/3010994939c1bc21df0c9e2931e9baee4564815a)
-- Last commit reviewed: [e9ed9647baa4c5229b60a8c2f2388be6f009b186](https://github.com/DomCR/ACadSharp/commit/e9ed9647baa4c5229b60a8c2f2388be6f009b186)
-- Review order: chronological/topological, 612 commits, inclusive of all commits after the original baseline.
-- Review date: 2026-09-30
+- Last commit reviewed: [014e9e84414fbca0ad5efa40b4fcdc0453734097](https://github.com/DomCR/ACadSharp/commit/014e9e84414fbca0ad5efa40b4fcdc0453734097)
+- Review order: chronological/topological, 644 commits, inclusive of all commits after the original baseline.
+- Review date: 2026-10-12
 
 ## Result
 
@@ -21,7 +21,9 @@ The 2026-09-21 review additionally converted default DWG layer-color fallback ha
 
 The 2026-09-30 review additionally converted structured ACDS schemas and records, embedded ACDS records, leader break information, MultiLeader defaults and IO, dictionary entry pairing, DimensionStyle linetype handles and postfix defaults, XRecord cloning flags, Polyline3D smooth-surface DWG flags, DWG template measurement units, and structured ACDS binary-data attachment. The OLE2FRAME empty-payload guard, transparency behavior, dictionary-template behavior, and pre-R2007 MultiLeader arrowhead handling were already represented.
 
-Two upstream areas remain explicitly partial: native AutoCAD Mechanical/BOM entity models, and the external DWG Prototype1b ACIS section. Proxy payloads are retained even when a record is not typed, and inline/DXF ACIS data is supported.
+The 2026-10-12 review additionally converted empty DXF dictionary filtering, DWG Prototype1b segment/schema/data parsing and blob assembly, typed document lookup, surface entity reading, writer exclusion, and DXF class definitions. Multi-chunk DXF ACDS assembly was already implemented in the previous synchronization. DWG storage fixtures cover inline records, two-page blobs, owner attachment, and failsafe truncation; surface fixtures cover all seven entity types.
+
+Native AutoCAD Mechanical/BOM entity models remain partial. DWG Prototype1b now supports reading schema-backed ACIS payloads, including blob pages; storage writing is not implemented. Surface entities retain their modeler payloads, with DXF isolines decoded, while detailed surface parameters and surface writing remain unsupported as upstream specifies.
 
 ## Commit-by-commit audit
 
@@ -639,3 +641,35 @@ Two upstream areas remain explicitly partial: native AutoCAD Mechanical/BOM enti
 | 610 | [dcef4c67](https://github.com/DomCR/ACadSharp/commit/dcef4c673e51b77b77e38bdcec21dcfa7d2a52b2) | 2026-09-30 | reader cleanup | Reviewed — reader cleanup only; no independent TypeScript feature. |
 | 611 | [6db67d44](https://github.com/DomCR/ACadSharp/commit/6db67d44398a15ec04c02600d6108f73f85060c9) | 2026-09-30 | Update project version to 3.8.6 | Reviewed — C# package version only; no TypeScript package-version change. |
 | 612 | [e9ed9647](https://github.com/DomCR/ACadSharp/commit/e9ed9647baa4c5229b60a8c2f2388be6f009b186) | 2026-09-30 | Merge pull request #1174 from DomCR/DxfAcdsDataSection | Reviewed — integration only; no independent TypeScript feature. |
+| 613 | [1fe4bb41](https://github.com/DomCR/ACadSharp/commit/1fe4bb41cf8181b915ce0a23756ff3217334ecef) | 2026-09-29 | Refine DXF dictionary defaults and writers | Converted — empty child dictionaries are omitted from DXF dictionary output. |
+| 614 | [fff41bef](https://github.com/DomCR/ACadSharp/commit/fff41befe4cfa31071c5a4a82dd7d6f054cb9095) | 2026-10-01 | Update project version to 3.8.6 | Reviewed — C# package version only; no TypeScript package-version change. |
+| 615 | [88251760](https://github.com/DomCR/ACadSharp/commit/8825176084ea4f8a9658a3ba0c85b5702a353aed) | 2026-10-01 | Merge pull request #1262 from DomCR/issue/1235_CadDictionary-empty-fix | Reviewed — integration only; no independent TypeScript feature. |
+| 616 | [f68a81e0](https://github.com/DomCR/ACadSharp/commit/f68a81e0a6b50893845e5f79fa4ea2c0672a1f23) | 2026-10-01 | Refactor Prototype1b DWG parsing | Converted — added bounded Prototype1b file-header and segment-index parsing. |
+| 617 | [2870b90a](https://github.com/DomCR/ACadSharp/commit/2870b90a21581e021f9f233f64fc49a0382631fe) | 2026-10-01 | Parse DWG schema index and improve models | Converted — added DWG schema-index pointers and name parsing. |
+| 618 | [e6033164](https://github.com/DomCR/ACadSharp/commit/e6033164b55d9b0c2825c9f8cabaecc1903a16b5) | 2026-10-02 | Refactor ACDS schema storage and parsing | Converted — decoded DWG schema records, flags, values, and property names; updated the shared DXF schema model. |
+| 619 | [43c6e7b2](https://github.com/DomCR/ACadSharp/commit/43c6e7b252655759116c0a1fc740cbd657eeb684) | 2026-10-02 | Read and store DWG data index entries | Converted — parsed and retained DWG data-index entries. |
+| 620 | [1835dd13](https://github.com/DomCR/ACadSharp/commit/1835dd13bfde02a3c9dfcbc83cdcdf67f05a0caa) | 2026-10-04 | comment | Reviewed — comment only; no behavior change. |
+| 621 | [29168090](https://github.com/DomCR/ACadSharp/commit/291680903feabfaf65affa49d26ba1d279d7cabd) | 2026-10-06 | Add DWG Prototype 1b data storage parsing | Converted — decoded inline Prototype1b records and attached their ACIS data; negative Julian-date milliseconds are ignored. |
+| 622 | [af4b0deb](https://github.com/DomCR/ACadSharp/commit/af4b0deb1893d52fbe2d42841aa56b97eef868ab) | 2026-10-06 | #PR1268 v3.8.7 | Reviewed — C# package version only; no TypeScript package-version change. |
+| 623 | [6ba46a3e](https://github.com/DomCR/ACadSharp/commit/6ba46a3efa102ee4b057168b20d8f8fab6353fe9) | 2026-10-01 | Join every binary chunk of an ACDSDATA record column | Reviewed — multi-chunk ACDS column assembly was already implemented in the previous synchronization. |
+| 624 | [996b1f80](https://github.com/DomCR/ACadSharp/commit/996b1f80c918076722a32251a7097f3359a5eb28) | 2026-10-06 | Merge pull request #1268 from ilCosmico/fix/acds-dxf-chunks | Reviewed — integration only; no independent TypeScript feature. |
+| 625 | [78a562a6](https://github.com/DomCR/ACadSharp/commit/78a562a66a5e43820a00f13be6645adc626071c9) | 2026-10-06 | Merge branch 'master' of https://github.com/DomCR/ACadSharp | Reviewed — integration only; no independent TypeScript feature. |
+| 626 | [e0ddce35](https://github.com/DomCR/ACadSharp/commit/e0ddce358505a18f599a02cb0e706d6a24cf7259) | 2026-10-06 | Merge remote-tracking branch 'origin/master' into issue-822/ACIS-dwg | Reviewed — integration only; no independent TypeScript feature. |
+| 627 | [e0d4d983](https://github.com/DomCR/ACadSharp/commit/e0d4d983c0b326151c0497f288a6839b969f32b2) | 2026-10-06 | Refactor Prototype 1b storage parsing | Converted — ACDS columns use explicit handles and binary payloads shared by DXF and DWG. |
+| 628 | [c549fe40](https://github.com/DomCR/ACadSharp/commit/c549fe40fb8b826213d06813db9dbc60cfbf4f93) | 2026-10-06 | Store DWG blobs and decode data entries | Converted — read and assembled blob pages; inline, multi-page, owner-attachment, and truncation fixtures pass. |
+| 629 | [01036a88](https://github.com/DomCR/ACadSharp/commit/01036a88b4678a2a84f0bb9ef309ee2d73f0a514) | 2026-10-07 | Update project version to 3.8.8 | Reviewed — C# package version only; no TypeScript package-version change. |
+| 630 | [06475260](https://github.com/DomCR/ACadSharp/commit/0647526036f472e967b4e65343240a3514f86fe9) | 2026-10-07 | Merge pull request #1270 from DomCR/issue-822/ACIS-dwg | Reviewed — integration only; no independent TypeScript feature. |
+| 631 | [22f59a57](https://github.com/DomCR/ACadSharp/commit/22f59a570f4f23cdb6b2a0d577bdb79398810600) | 2026-10-08 | #PR1273 v3.8.9 | Reviewed — C# package version only; no TypeScript package-version change. |
+| 632 | [fed64580](https://github.com/DomCR/ACadSharp/commit/fed6458048bdd7c910dc9bc8e73255d1e1285bd8) | 2026-10-07 | Return false from TryGetCadObject when the object is not of the requested type | Converted — optional runtime type checks make document object lookup return false and null for a mismatched type. |
+| 633 | [bd79b042](https://github.com/DomCR/ACadSharp/commit/bd79b042235695087ea7bae4800687951f6f417f) | 2026-10-08 | Remove the CadDocumentBuilder test | Reviewed — C# test removal only; no independent TypeScript feature. |
+| 634 | [8f982b7e](https://github.com/DomCR/ACadSharp/commit/8f982b7e9fd0fe886bd0d8704cd170ff907ca32c) | 2026-10-08 | Merge pull request #1273 from ilCosmico/fix/trygetcadobject-type | Reviewed — integration only; no independent TypeScript feature. |
+| 635 | [b02dee2e](https://github.com/DomCR/ACadSharp/commit/b02dee2e1a71472c97043817a76ccc5e8aec3a42) | 2026-10-08 | Merge branch 'master' of https://github.com/DomCR/ACadSharp | Reviewed — integration only; no independent TypeScript feature. |
+| 636 | [15831b0d](https://github.com/DomCR/ACadSharp/commit/15831b0d14be61235b56cd17f79c40deaf0d9aae) | 2026-10-08 | #PR1155 v3.8.10 | Reviewed — C# package version only; no TypeScript package-version change. |
+| 637 | [0c6026a4](https://github.com/DomCR/ACadSharp/commit/0c6026a4c828f925eaa7821e95b37029bb1a0661) | 2026-07-20 | Read the surface entity family as modeler geometry | Converted — added seven surface entity models, metadata, exports, and DXF/DWG reader dispatch; DXF isolines and modeler payloads are decoded. |
+| 638 | [f6d28330](https://github.com/DomCR/ACadSharp/commit/f6d283303d188c0e516d471d2bac1544ac498af0) | 2026-09-30 | Skip the surface entities in the DWG and DXF writers | Converted — surface entities are excluded from DXF and DWG writing until full serialization is supported. |
+| 639 | [7a6958e8](https://github.com/DomCR/ACadSharp/commit/7a6958e8add3b922950367132f760e67e2a84e2f) | 2026-09-30 | Use file-scoped namespaces in the surface entity files | Reviewed — C# namespace formatting only; no TypeScript behavior change. |
+| 640 | [8beb6600](https://github.com/DomCR/ACadSharp/commit/8beb6600e42d0f7b526df4c020b55268f3e79e69) | 2026-09-30 | Define the DXF class of the surface entities | Converted — surface entities provide their DXF class metadata and proxy flags. |
+| 641 | [369f9088](https://github.com/DomCR/ACadSharp/commit/369f9088869b7b65f49052ebd57e158bb0242531) | 2026-10-01 | Remove the DXF surface reading tests | Reviewed — upstream test removal only; retained useful TypeScript surface fixtures. |
+| 642 | [d05ea12c](https://github.com/DomCR/ACadSharp/commit/d05ea12ccac19d2a1735ef81648b7f07495cad3c) | 2026-10-01 | Remove the modeler geometry comment from readSurface | Reviewed — comment removal only; no behavior change. |
+| 643 | [0cca9019](https://github.com/DomCR/ACadSharp/commit/0cca90190a77cbee373eadb3389114c85a1bb2f6) | 2026-10-08 | Merge pull request #1155 from ilCosmico/feature/surface-entities-read | Reviewed — integration only; no independent TypeScript feature. |
+| 644 | [014e9e84](https://github.com/DomCR/ACadSharp/commit/014e9e84414fbca0ad5efa40b4fcdc0453734097) | 2026-10-08 | Merge branch 'master' of https://github.com/DomCR/ACadSharp | Reviewed — integration only; no independent TypeScript feature. |
