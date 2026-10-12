@@ -249,10 +249,35 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 				if (size + 4 <= maxSize) {
 					this._storeData(storage, header.entry.schemaIndex, header.handle, this._bytes(size));
 				} else if (size === 0xbb106bb1) {
-					this._ulong();
+					const totalSize = this._ulong();
 					const pages = this._uint();
 					this._bytes(20);
-					this._bytes(pages * 8);
+					this._requireBytes(pages * 8);
+					const pointers: number[] = [];
+					for (let j = 0; j < pages; j++) {
+						pointers.push(this._uint());
+						this._uint();
+					}
+					const chunks: Uint8Array[] = [];
+					let length = 0;
+					for (const pointer of pointers) {
+						this._seek(this._segmentOffset(pointer));
+						this._readSegmentHeader();
+						this._ulong();
+						this._ulong();
+						this._uint();
+						this._uint();
+						const pageSize = this._ulong();
+						if (pageSize > totalSize - length) throw new Error('Prototype1b blob exceeds declared size');
+						const chunk = this._bytes(pageSize);
+						chunks.push(chunk);
+						length += chunk.length;
+					}
+					if (length !== totalSize) throw new Error('Incomplete Prototype1b blob');
+					const data = new Uint8Array(length);
+					let offset = 0;
+					for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
+					this._storeData(storage, header.entry.schemaIndex, header.handle, data);
 				} else {
 					throw new Error('Prototype1b record exceeds its segment');
 				}
