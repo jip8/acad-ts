@@ -107,9 +107,9 @@ export abstract class CadDocumentBuilder {
 			const dataColumn = record.columns.get(CadFileDataStorage.asmData);
 			if (!idColumn || !dataColumn) continue;
 
-			const handle = idColumn.value;
-			const data = dataColumn.value;
-			if (typeof handle !== 'number' || !(data instanceof Uint8Array)) continue;
+			const handle = idColumn.handle;
+			const data = dataColumn.data;
+			if (data === null) continue;
 
 			const geometry = this.tryGetCadObject<ModelerGeometry>(handle);
 			if (geometry instanceof ModelerGeometry) {

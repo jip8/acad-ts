@@ -249,7 +249,6 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 				if (size + 4 <= maxSize) {
 					this._storeData(storage, header.entry.schemaIndex, header.handle, this._bytes(size));
 				} else if (size === 0xbb106bb1) {
-					// Blob pages are parsed in the next upstream storage stage.
 					this._ulong();
 					const pages = this._uint();
 					this._bytes(20);
@@ -269,8 +268,8 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			const column = new AcdsRecordColumn();
 			column.name = property.name;
 			column.dataType = property.type;
-			if (property.name === CadFileDataStorage.id) { column.code = 320; column.value = handle; }
-			else if (property.name === CadFileDataStorage.asmData) { column.code = 310; column.value = data; }
+			if (property.name === CadFileDataStorage.id) column.handle = handle;
+			else if (property.name === CadFileDataStorage.asmData) column.data = data;
 			record.columns.set(column.name, column);
 		}
 		storage.records.push(record);

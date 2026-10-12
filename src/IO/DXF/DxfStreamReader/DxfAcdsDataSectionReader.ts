@@ -66,14 +66,12 @@ export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 		if (directHandle && directChunks.length > 0) {
 			const idColumn = new AcdsRecordColumn();
 			idColumn.name = CadFileDataStorage.id;
-			idColumn.code = 320;
-			idColumn.value = directHandle;
+			idColumn.handle = directHandle;
 			record.columns.set(idColumn.name, idColumn);
 
 			const dataColumn = new AcdsRecordColumn();
 			dataColumn.name = CadFileDataStorage.asmData;
-			dataColumn.code = 310;
-			dataColumn.value = this._combineChunks(directChunks);
+			dataColumn.data = this._combineChunks(directChunks);
 			record.columns.set(dataColumn.name, dataColumn);
 		}
 
@@ -92,11 +90,12 @@ export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 		) {
 			if (this._reader.code === 280) {
 				column.dataType = this._reader.valueAsShort;
-			} else if (this._reader.code === 310 && column.code === 310 && column.value instanceof Uint8Array) {
-				column.value = this._combineChunks([column.value, this._reader.valueAsBinaryChunk]);
-			} else {
-				column.code = this._reader.code;
-				column.value = this._reader.value;
+			} else if (this._reader.code === 310) {
+				column.data = this._combineChunks([column.data ?? new Uint8Array(), this._reader.valueAsBinaryChunk]);
+			} else if (this._reader.code === 320) {
+				column.handle = this._reader.valueAsHandle;
+			} else if (this._reader.code !== 94) {
+				this._builder.notify(`Unexpected code ${this._reader.code} in ACDS record column.`, NotificationType.Warning);
 			}
 			this._reader.readNext();
 		}
