@@ -6,6 +6,9 @@ import { DwgSectionIO } from '../DwgSectionIO.js';
 import { NotificationType } from '../../NotificationEventHandler.js';
 import { IDwgStreamReader } from './IDwgStreamReader.js';
 import { decodeCadString } from '../../TextEncoding.js';
+import { AcdsSchema } from '../../../DataStorage/AcdsSchema.js';
+import { AcdsSchemaRecord } from '../../../DataStorage/AcdsSchemaRecord.js';
+import { SchemaRecordFlags } from '../../../DataStorage/SchemaRecordFlags.js';
 
 interface FileHeader {
 	segmentIndexOffset: number;
@@ -40,6 +43,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			this._fileHeader = this._readFileHeader();
 			this._readFileSegmentIndex();
 			this._schemaIndex = this._readSchemaIndex();
+			this._readSchemaData(storage);
 			this._builder.dataStorage = storage;
 		} catch (error) {
 			if (!this._builder.configuration.failsafe) throw error;
@@ -143,5 +147,61 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			for (let i = 0; i < names; i++) schema.names.push(this._readString());
 		}
 		return schema;
+	}
+
+	private _ushort(): number {
+		this._requireBytes(2);
+		return this._reader.readShort() & 0xFFFF;
+	}
+	private _readSchemaData(storage: CadFileDataStorage): void {
+		const indices = new Set([...this._schemaIndex.schemaPointers, ...this._schemaIndex.propertyPointers].map(p => p.segmentIndex));
+		for (const index of indices) {
+			this._seek(this._segmentOffset(index));
+			const header = this._readSegmentHeader();
+			const properties = this._schemaIndex.propertyPointers.filter(p => p.segmentIndex === header.segmentIndex);
+			this._bytes(properties.length * 8);
+			const schemas: AcdsSchema[] = [];
+			for (const pointer of this._schemaIndex.schemaPointers.filter(p => p.segmentIndex === header.segmentIndex)) {
+				const schema = new AcdsSchema();
+				schema.index = pointer.index;
+				schema.name = this._schemaIndex.names[pointer.index] ?? '';
+				const indexCount = this._ushort();
+				this._requireBytes(indexCount * 8);
+				for (let i = 0; i < indexCount; i++) schema.indices.push(this._ulong());
+				const recordCount = this._ushort();
+				for (let i = 0; i < recordCount; i++) schema.embeddedRecords.push(this._readSchemaRecord());
+				schemas.push(schema);
+			}
+			const boundary = this._reader.position % 16;
+			if (boundary !== 0) this._bytes(16 - boundary);
+			const count = this._uint();
+			this._requireBytes(count);
+			const names: string[] = [];
+			for (let i = 0; i < count; i++) names.push(this._readString());
+			for (const schema of schemas) {
+				for (const record of schema.embeddedRecords) {
+					if (names[record.nameIndex] === undefined) throw new Error('Invalid Prototype1b property name index');
+					record.name = names[record.nameIndex];
+				}
+				storage.schemes.push(schema);
+			}
+		}
+	}
+	private _readSchemaRecord(): AcdsSchemaRecord {
+		const record = new AcdsSchemaRecord();
+		record.flags = this._uint() as SchemaRecordFlags;
+		record.nameIndex = this._uint();
+		if ((record.flags & SchemaRecordFlags.NoType) === 0) {
+			record.type = this._uint();
+			record.typeSize = record.type === 0xE ? this._uint() : (AcdsSchemaRecord.typeSizes[record.type] ?? 0);
+		}
+		if (record.flags === SchemaRecordFlags.Unknown0) record.unknown1 = this._uint();
+		else if (record.flags === SchemaRecordFlags.Unknown1) record.unknown2 = this._uint();
+		const count = this._ushort();
+		if (record.typeSize > 0) {
+			this._requireBytes(count * record.typeSize);
+			for (let i = 0; i < count; i++) record.values.push(this._bytes(record.typeSize));
+		}
+		return record;
 	}
 }

@@ -11,6 +11,7 @@ import { AcdsSchemaRecord } from '../../../DataStorage/AcdsSchemaRecord.js';
 import { AcdsRecord } from '../../../DataStorage/AcdsRecord.js';
 import { AcdsRecordColumn } from '../../../DataStorage/AcdsRecordColumn.js';
 import { NotificationType } from '../../NotificationEventHandler.js';
+import { SchemaRecordFlags } from '../../../DataStorage/SchemaRecordFlags.js';
 
 export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 	constructor(reader: IDxfStreamReader, builder: DxfDocumentBuilder) {
@@ -176,8 +177,11 @@ export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 				case 95:
 					record.id = this._reader.valueAsShort;
 					break;
+				case 91:
+					record.flags = this._reader.valueAsInt as SchemaRecordFlags;
+					break;
 				case 280:
-					record.value280 = this._reader.valueAsShort;
+					record.type = this._reader.valueAsInt;
 					break;
 				case 291:
 					record.value291 = this._reader.valueAsShort;
