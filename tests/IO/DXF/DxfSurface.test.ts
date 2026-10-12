@@ -25,5 +25,9 @@ describe('DXF surfaces', () => {
 		expect(entity.uIsolines).toBe(6);
 		expect(entity.vIsolines).toBe(7);
 		expect(entity.getAcisText()).toBe('400 0 1 0\nbody $-1 $1 $-1 $-1 #');
+		const definition = entity.getDxfClass();
+		expect(definition?.dxfName).toBe(entity.objectName);
+		expect(definition?.cppClassName).toBe(entity.subclassMarker);
+		expect(definition?.isAnEntity).toBe(true);
 	});
 });
