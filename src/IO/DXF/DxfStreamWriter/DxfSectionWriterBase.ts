@@ -63,6 +63,7 @@ import { RasterImage } from '../../../Entities/RasterImage.js';
 import { Wipeout } from '../../../Entities/Wipeout.js';
 import { Seqend } from '../../../Entities/Seqend.js';
 import { ModelerGeometry } from '../../../Entities/ModelerGeometry.js';
+import { Surface } from '../../../Entities/Surface.js';
 import { Region } from '../../../Entities/Region.js';
 import { Solid3D } from '../../../Entities/Solid3D.js';
 import { AttributeBase } from '../../../Entities/AttributeBase.js';
@@ -406,6 +407,7 @@ export abstract class DxfSectionWriterBase {
   }
 
   private _isEntitySupported(entity: Entity): boolean {
+    if (entity instanceof Surface) return false;
     if (entity instanceof UnknownEntity) {
       return false;
     }

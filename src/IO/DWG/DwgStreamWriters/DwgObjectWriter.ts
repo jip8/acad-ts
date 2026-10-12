@@ -52,6 +52,7 @@ import { Shape } from '../../../Entities/Shape.js';
 import { Solid } from '../../../Entities/Solid.js';
 import { Solid3D } from '../../../Entities/Solid3D.js';
 import { ModelerGeometry, ModelerGeometryWire } from '../../../Entities/ModelerGeometry.js';
+import { Surface } from '../../../Entities/Surface.js';
 import { Spline, SplineFlags, SplineFlags1, KnotParametrization } from '../../../Entities/Spline.js';
 import { CadWipeoutBase, ClipType, ClipMode } from '../../../Entities/CadWipeoutBase.js';
 import { TextEntity, TextMirrorFlag, TextHorizontalAlignment, TextVerticalAlignmentType } from '../../../Entities/TextEntity.js';
@@ -436,6 +437,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _isEntitySupported(entity: Entity): boolean {
+		if (entity instanceof Surface) return false;
 		if (entity instanceof Seqend) return false;
 		if (entity instanceof UnknownEntity) return false;
 		if (entity instanceof Shape) return this.writeShapes;
