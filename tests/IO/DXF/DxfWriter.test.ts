@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { TestVariables } from '../../TestVariables.js';
 import { DxfWriter } from '../../../src/IO/DXF/DxfWriter.js';
 import { DxfReader } from '../../../src/IO/DXF/DxfReader.js';
+import { DxfWriterConfiguration } from '../../../src/IO/DXF/DxfWriterConfiguration.js';
 import { CadDocument } from '../../../src/CadDocument.js';
 import { ACadVersion } from '../../../src/ACadVersion.js';
 import { Line } from '../../../src/Entities/Line.js';
@@ -87,6 +88,47 @@ function containsByteSequence(data: Uint8Array, sequence: number[]): boolean {
 }
 
 describe('DxfWriterTests', () => {
+  const doubleRoundTripCases: [number, number | null, number][] = [
+    4.656612873077393e-10, -4.656612873077393e-10, 1.2345678901234568e-10,
+    2.5e-20, 1.5e-30, 1.5e-40, 1.5e-100, 1.5e+30, 9.9e+30,
+    1e-10, 5e-10, 2.5e-11, 1.234e-7, 1e-9, 0, 0.1, 1.5, 100,
+    1234.5678, 38525802.91236212, Number.MIN_VALUE, Number.MAX_VALUE,
+  ].map(value => [value, null, value]);
+  doubleRoundTripCases.push(
+    [1.5e+30, 6, 1.5e+30],
+    [-9.9e+30, 6, -9.9e+30],
+    [1.5e+100, 6, 1.5e+100],
+    [1.5, 6, 1.5],
+    [100, 6, 100],
+    [1234.567891234, 6, 1234.567891],
+    [4.656612873077393e-10, 6, 0],
+    [1.5, 0, 2],
+  );
+
+  it.each(doubleRoundTripCases)(
+    'round-trips ASCII double %s with decimalPrecision %s as %s',
+    (value, precision, expected) => {
+      const doc = new CadDocument(ACadVersion.AC1021);
+      const line = new Line();
+      line.startPoint.y = value;
+      line.endPoint.x = 10;
+      line.endPoint.y = value;
+      doc.entities.add(line);
+
+      const configuration = new DxfWriterConfiguration();
+      configuration.decimalPrecision = precision;
+      const stream = new InMemoryAsciiStream();
+      DxfWriter.writeToStream(stream, doc, false, configuration);
+
+      const reread = DxfReader.readFromStream(stream.toUint8Array());
+      const rereadLine = [...reread.entities].find((entity): entity is Line => entity instanceof Line);
+
+      expect(rereadLine).toBeDefined();
+      expect(rereadLine?.startPoint.y).toBe(expected);
+      expect(rereadLine?.endPoint.y).toBe(expected);
+    },
+  );
+
   it.each([
     ['ASCII', false],
     ['binary', true],
