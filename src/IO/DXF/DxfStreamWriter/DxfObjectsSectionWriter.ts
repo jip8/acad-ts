@@ -94,6 +94,7 @@ export class DxfObjectsSectionWriter extends DxfSectionWriterBase {
 	  const handle = dict.entryHandles[i];
 	  const entryName = dict.entryNames[i];
 	  const item = dict.getEntry<NonGraphicalObject>(entryName);
+	  if (item instanceof CadDictionary && item.entryNames.length === 0) continue;
 	  if (item == null || entryName === CadDictionary.acadMaterial || !this._isObjectSupported(item)) {
 		continue;
 	  }
