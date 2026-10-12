@@ -1,4 +1,5 @@
 export class DwgSectionDefinition {
+	static readonly acDsPrototype = 'AcDb:AcDsPrototype_1b';
 	static readonly acDbObjects = 'AcDb:AcDbObjects';
 	static readonly appInfo = 'AcDb:AppInfo';
 	static readonly auxHeader = 'AcDb:AuxHeader';

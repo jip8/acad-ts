@@ -34,6 +34,7 @@ import { DwgObjectReader } from './DwgStreamReaders/DwgObjectReader.js';
 import { DwgPreviewReader } from './DwgStreamReaders/DwgPreviewReader.js';
 import { DwgSummaryInfoReader } from './DwgStreamReaders/DwgSummaryInfoReader.js';
 import { DwgAuxHeaderReader } from './DwgStreamReaders/DwgAuxHeaderReader.js';
+import { DwgPrototype1bReader } from './DwgStreamReaders/DwgPrototype1bReader.js';
 import { DwgLZ77AC18Decompressor } from './DwgStreamReaders/DwgLZ77AC18Decompressor.js';
 import { DwgLZ77AC21Decompressor } from './DwgStreamReaders/DwgLZ77AC21Decompressor.js';
 
@@ -77,6 +78,7 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 		this._document.header.document = this._document;
 		this._readTemplate();
 		this._document.classes = this._readClasses();
+		this._readDataStorage();
 
 		this._readObjects();
 		this._readAuxHeader();
@@ -211,6 +213,12 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 
 		if (descriptionLength > 0) reader.readBytes(descriptionLength);
 		this._document.header.measurementUnits = reader.readShort();
+	}
+
+	private _readDataStorage(): void {
+		if (this._fileHeader.acadVersion < ACadVersion.AC1027) return;
+		const stream = this._getSectionStream(DwgSectionDefinition.acDsPrototype);
+		if (stream) new DwgPrototype1bReader(this._fileHeader.acadVersion, this._builder, stream).read();
 	}
 
 	private _readHandles(): Map<number, number> {
