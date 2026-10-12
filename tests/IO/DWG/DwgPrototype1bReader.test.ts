@@ -6,6 +6,8 @@ import { DwgReaderConfiguration } from '../../../src/IO/DWG/DwgReaderConfigurati
 import { DwgStreamReaderAC24 } from '../../../src/IO/DWG/DwgStreamReaders/DwgStreamReaderAC24.js';
 import { DwgPrototype1bReader } from '../../../src/IO/DWG/DwgStreamReaders/DwgPrototype1bReader.js';
 import { CadFileDataStorage } from '../../../src/DataStorage/CadFileDataStorage.js';
+import { Region } from '../../../src/Entities/Region.js';
+import { CadEntityTemplate } from '../../../src/IO/Templates/CadEntityTemplate.js';
 
 function fixture(blob: boolean): Uint8Array {
 	const bytes = new Uint8Array(2048);
@@ -88,12 +90,17 @@ describe('DwgPrototype1bReader', () => {
 	it.each([false, true])('decodes schema-backed ACIS data (blob=%s)', blob => {
 		const builder = new DwgDocumentBuilder(ACadVersion.AC1027, new CadDocument(), new DwgReaderConfiguration());
 		builder.configuration.failsafe = false;
+		const region = new Region();
+		region.handle = 0x123;
+		builder.addTemplate(new CadEntityTemplate(region));
 		const stream = new DwgStreamReaderAC24(fixture(blob), false);
 		new DwgPrototype1bReader(ACadVersion.AC1027, builder, stream).read();
 		expect(builder.dataStorage?.schemes[0].name).toBe('AcDb3DSolid_ASM_Data');
 		const record = builder.dataStorage?.records[0];
 		expect(record?.columns.get(CadFileDataStorage.id)?.handle).toBe(0x123);
 		expect(record?.columns.get(CadFileDataStorage.asmData)?.data).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
+		builder.buildDataStorage();
+		expect(region.acisData).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
 	});
 
 	it('reports truncated storage in failsafe mode', () => {
