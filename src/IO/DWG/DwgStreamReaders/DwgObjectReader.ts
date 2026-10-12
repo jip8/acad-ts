@@ -144,6 +144,13 @@ import { CadWipeoutBase, ImageDisplayFlags, ClipMode, ClipType } from '../../../
 import { PdfUnderlay } from '../../../Entities/PdfUnderlay.js';
 import { ModelerGeometry , ModelerGeometryWire, ModelerGeometrySilhouette} from '../../../Entities/ModelerGeometry.js';
 import { Region } from '../../../Entities/Region.js';
+import { Surface } from '../../../Entities/Surface.js';
+import { ExtrudedSurface } from '../../../Entities/ExtrudedSurface.js';
+import { LoftedSurface } from '../../../Entities/LoftedSurface.js';
+import { NurbSurface } from '../../../Entities/NurbSurface.js';
+import { PlaneSurface } from '../../../Entities/PlaneSurface.js';
+import { RevolvedSurface } from '../../../Entities/RevolvedSurface.js';
+import { SweptSurface } from '../../../Entities/SweptSurface.js';
 import { CadBody } from '../../../Entities/CadBody.js';
 import { UnknownEntity } from '../../../Entities/UnknownEntity.js';
 import { TableEntity, CellType, CellContent, CellContentGeometry, CellRange, CustomDataEntry, CellStyle, CellStyleType, TableCellContentType, TableCellStateFlags, ContentFormat, CellEdgeFlags, CellBorder, TableEntityBorderType, TableCellContentLayoutFlags, TableCellStylePropertyFlags, MarginFlags, TableBorderPropertyFlags, TableCellStylePropertyFlags as TCFlags, TableOverrideFlags, BorderOverrideFlags, TableAttribute, BreakOptionFlags, BreakFlowDirection, BreakHeight, BreakRowRange, BreakData, TableEntityColumn, TableEntityRow, TableEntityCell, CellAlignmentType , CellStyleClass, CellOverrideFlags } from '../../../Entities/TableEntity.js';
@@ -888,6 +895,13 @@ export class DwgObjectReader extends DwgSectionIO {
       case 'PDFREFERENCE': template = this._readPdfUnderlay(); break;
       case 'SCALE': template = this._readScale(); break;
       case 'SORTENTSTABLE': template = this._readSortentsTable(); break;
+      case DxfFileToken.entitySurface: template = this._readModelerGeometry(new CadEntityTemplate(new Surface())); break;
+      case DxfFileToken.entityExtrudedSurface: template = this._readModelerGeometry(new CadEntityTemplate(new ExtrudedSurface())); break;
+      case DxfFileToken.entityLoftedSurface: template = this._readModelerGeometry(new CadEntityTemplate(new LoftedSurface())); break;
+      case DxfFileToken.entityNurbSurface: template = this._readModelerGeometry(new CadEntityTemplate(new NurbSurface())); break;
+      case DxfFileToken.entityPlaneSurface: template = this._readModelerGeometry(new CadEntityTemplate(new PlaneSurface())); break;
+      case DxfFileToken.entityRevolvedSurface: template = this._readModelerGeometry(new CadEntityTemplate(new RevolvedSurface())); break;
+      case DxfFileToken.entitySweptSurface: template = this._readModelerGeometry(new CadEntityTemplate(new SweptSurface())); break;
       case 'RASTERVARIABLES': template = this._readRasterVariables(); break;
       case DxfFileToken.objectWipeoutVariables: template = this._readWipeoutVariables(); break;
       case 'WIPEOUT': template = this._readCadImage(new Wipeout()); break;

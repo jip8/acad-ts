@@ -1,6 +1,13 @@
 import { ClassMetadata } from '../MetadataTypes.js';
 
 export const metadataLookupEntities: readonly ClassMetadata[] = [
+{"typeName":"Surface","baseTypeName":"ModelerGeometry","properties":[{"propertyName":"uIsolines","valueCodes":[71],"referenceType":0},{"propertyName":"vIsolines","valueCodes":[72],"referenceType":0}],"systemVariables":[],"dxfName":"SURFACE","dxfSubClassName":"AcDbSurface"},
+{"typeName":"ExtrudedSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"EXTRUDEDSURFACE","dxfSubClassName":"AcDbExtrudedSurface"},
+{"typeName":"LoftedSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"LOFTEDSURFACE","dxfSubClassName":"AcDbLoftedSurface"},
+{"typeName":"NurbSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"NURBSURFACE","dxfSubClassName":"AcDbNurbSurface"},
+{"typeName":"PlaneSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"PLANESURFACE","dxfSubClassName":"AcDbPlaneSurface"},
+{"typeName":"RevolvedSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"REVOLVEDSURFACE","dxfSubClassName":"AcDbRevolvedSurface"},
+{"typeName":"SweptSurface","baseTypeName":"Surface","properties":[],"systemVariables":[],"dxfName":"SWEPTSURFACE","dxfSubClassName":"AcDbSweptSurface"},
   {
     "typeName": "Arc",
     "baseTypeName": "Circle",

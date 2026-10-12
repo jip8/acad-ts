@@ -1,4 +1,11 @@
 export class DxfSubclassMarker {
+	public static readonly surface = 'AcDbSurface';
+	public static readonly extrudedSurface = 'AcDbExtrudedSurface';
+	public static readonly loftedSurface = 'AcDbLoftedSurface';
+	public static readonly nurbSurface = 'AcDbNurbSurface';
+	public static readonly planeSurface = 'AcDbPlaneSurface';
+	public static readonly revolvedSurface = 'AcDbRevolvedSurface';
+	public static readonly sweptSurface = 'AcDbSweptSurface';
 	public static readonly aecWall = "AecDbWall";
 	public static readonly aecDbWallStyle = "AecDbWallStyle";
 	public static readonly aecDbCleanupGroupDef = "AecDbCleanupGroupDef";

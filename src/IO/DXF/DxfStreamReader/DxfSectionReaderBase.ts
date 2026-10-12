@@ -45,6 +45,13 @@ import { Ole2Frame } from '../../../Entities/Ole2Frame.js';
 import { Ray } from '../../../Entities/Ray.js';
 import { RasterImage } from '../../../Entities/RasterImage.js';
 import { Region } from '../../../Entities/Region.js';
+import { Surface } from '../../../Entities/Surface.js';
+import { ExtrudedSurface } from '../../../Entities/ExtrudedSurface.js';
+import { LoftedSurface } from '../../../Entities/LoftedSurface.js';
+import { NurbSurface } from '../../../Entities/NurbSurface.js';
+import { PlaneSurface } from '../../../Entities/PlaneSurface.js';
+import { RevolvedSurface } from '../../../Entities/RevolvedSurface.js';
+import { SweptSurface } from '../../../Entities/SweptSurface.js';
 import { Seqend } from '../../../Entities/Seqend.js';
 import { Shape } from '../../../Entities/Shape.js';
 import { Solid } from '../../../Entities/Solid.js';
@@ -344,6 +351,20 @@ export abstract class DxfSectionReaderBase {
         return this.readEntityCodes(new CadSolid3DTemplate(), this._readSolid3d.bind(this), Solid3D);
       case DxfFileToken.entityRegion:
         return this.readEntityCodes(new CadEntityTemplate(new Region()), this._readModelerGeometry.bind(this), Region);
+      case DxfFileToken.entitySurface:
+        return this.readEntityCodes(new CadEntityTemplate(new Surface()), this._readSurface.bind(this), Surface);
+      case DxfFileToken.entityExtrudedSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new ExtrudedSurface()), this._readSurface.bind(this), ExtrudedSurface);
+      case DxfFileToken.entityLoftedSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new LoftedSurface()), this._readSurface.bind(this), LoftedSurface);
+      case DxfFileToken.entityNurbSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new NurbSurface()), this._readSurface.bind(this), NurbSurface);
+      case DxfFileToken.entityPlaneSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new PlaneSurface()), this._readSurface.bind(this), PlaneSurface);
+      case DxfFileToken.entityRevolvedSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new RevolvedSurface()), this._readSurface.bind(this), RevolvedSurface);
+      case DxfFileToken.entitySweptSurface:
+        return this.readEntityCodes(new CadEntityTemplate(new SweptSurface()), this._readSurface.bind(this), SweptSurface);
       case DxfFileToken.entityImage:
         return this.readEntityCodes(new CadWipeoutBaseTemplate(new RasterImage()), this._readWipeoutBase.bind(this), RasterImage);
       case DxfFileToken.entityWipeout:
@@ -1593,6 +1614,13 @@ export abstract class DxfSectionReaderBase {
       default:
         return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(mapName)!);
     }
+  }
+
+  private _readSurface(template: CadEntityTemplate, map: DxfMap): boolean {
+    const surface = template.cadObject as Surface;
+    if (this._reader.code === 71) { surface.uIsolines = this._reader.valueAsShort; return true; }
+    if (this._reader.code === 72) { surface.vIsolines = this._reader.valueAsShort; return true; }
+    return this._readModelerGeometry(template, map, DxfSubclassMarker.modelerGeometry);
   }
 
   private _readSolid3d(template: CadEntityTemplate, map: DxfMap, subclass?: string): boolean {

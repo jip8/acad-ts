@@ -57,6 +57,12 @@ export class DxfFileToken {
 	public static readonly entitySpline = "SPLINE";
 	public static readonly entitySun = "SUN";
 	public static readonly entitySurface = "SURFACE";
+	public static readonly entityExtrudedSurface = 'EXTRUDEDSURFACE';
+	public static readonly entityLoftedSurface = 'LOFTEDSURFACE';
+	public static readonly entityNurbSurface = 'NURBSURFACE';
+	public static readonly entityPlaneSurface = 'PLANESURFACE';
+	public static readonly entityRevolvedSurface = 'REVOLVEDSURFACE';
+	public static readonly entitySweptSurface = 'SWEPTSURFACE';
 	public static readonly entityTable = "ACAD_TABLE";
 	public static readonly entityText = "TEXT";
 	public static readonly entityTolerance = "TOLERANCE";
