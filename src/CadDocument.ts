@@ -175,10 +175,12 @@ export class CadDocument implements IHandledCadObject {
 		return (obj as CadObject) ?? null;
 	}
 
-	public tryGetCadObject(handle: number): { found: boolean; cadObject: CadObject | null } {
+	public tryGetCadObject(handle: number): { found: boolean; cadObject: CadObject | null };
+	public tryGetCadObject<T extends CadObject>(handle: number, type: abstract new (...args: any[]) => T): { found: boolean; cadObject: T | null };
+	public tryGetCadObject(handle: number, type?: abstract new (...args: any[]) => CadObject): { found: boolean; cadObject: CadObject | null } {
 		if (handle === this.handle) return { found: false, cadObject: null };
 		const obj = this._cadObjects.get(handle);
-		if (obj) {
+		if (obj && (!type || obj instanceof type)) {
 			return { found: true, cadObject: obj as CadObject };
 		}
 		return { found: false, cadObject: null };
