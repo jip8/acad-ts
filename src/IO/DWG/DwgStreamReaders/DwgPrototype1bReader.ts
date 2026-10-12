@@ -5,6 +5,7 @@ import { DwgSectionDefinition } from '../FileHeaders/DwgSectionDefinition.js';
 import { DwgSectionIO } from '../DwgSectionIO.js';
 import { NotificationType } from '../../NotificationEventHandler.js';
 import { IDwgStreamReader } from './IDwgStreamReader.js';
+import { decodeCadString } from '../../TextEncoding.js';
 
 interface FileHeader {
 	segmentIndexOffset: number;
@@ -20,11 +21,14 @@ interface SegmentHeader {
 	objectDataAlignmentOffset: number;
 }
 interface SegmentEntry { offset: number; size: number }
+interface SchemaPointer { index: number; segmentIndex: number; localOffset: number }
+interface SchemaIndex { header: SegmentHeader; schemaPointers: SchemaPointer[]; propertyPointers: SchemaPointer[]; names: string[] }
 
 export class DwgPrototype1bReader extends DwgSectionIO {
 	get sectionName(): string { return DwgSectionDefinition.acDsPrototype; }
 	private _fileHeader!: FileHeader;
 	private _segments: SegmentEntry[] = [];
+	private _schemaIndex!: SchemaIndex;
 
 	constructor(version: ACadVersion, private readonly _builder: DwgDocumentBuilder, private readonly _reader: IDwgStreamReader) {
 		super(version);
@@ -35,6 +39,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 		try {
 			this._fileHeader = this._readFileHeader();
 			this._readFileSegmentIndex();
+			this._schemaIndex = this._readSchemaIndex();
 			this._builder.dataStorage = storage;
 		} catch (error) {
 			if (!this._builder.configuration.failsafe) throw error;
@@ -90,5 +95,53 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 		for (let i = 0; i < this._fileHeader.segmentIndexEntryCount; i++) {
 			this._segments.push({ offset: this._ulong(), size: this._uint() });
 		}
+	}
+
+	private _segmentOffset(index: number): number {
+		const segment = this._segments[index];
+		if (!segment) throw new Error(`Prototype1b segment ${index} not found`);
+		return segment.offset;
+	}
+	private _readString(): string {
+		const bytes: number[] = [];
+		for (;;) {
+			this._requireBytes(1);
+			const value = this._reader.readByte();
+			if (value === 0) break;
+			bytes.push(value);
+		}
+		return decodeCadString(new Uint8Array(bytes), this._reader.encoding);
+	}
+	private _readSchemaIndex(): SchemaIndex {
+		const start = this._segmentOffset(this._fileHeader.schemaIndexSegmentIndex);
+		this._seek(start);
+		const header = this._readSegmentHeader();
+		const schema: SchemaIndex = { header, schemaPointers: [], propertyPointers: [], names: [] };
+		const count = this._uint();
+		this._uint();
+		this._requireBytes(count * 12);
+		for (let i = 0; i < count; i++) {
+			const index = this._uint();
+			const segmentIndex = this._uint();
+			const localOffset = this._uint();
+			schema.schemaPointers.push({ index, segmentIndex, localOffset });
+		}
+		this._ulong();
+		const properties = this._uint();
+		this._uint();
+		this._requireBytes(properties * 12);
+		for (let i = 0; i < properties; i++) {
+			const segmentIndex = this._uint();
+			const localOffset = this._uint();
+			const index = this._uint();
+			schema.propertyPointers.push({ index, segmentIndex, localOffset });
+		}
+		if (header.systemDataAlignmentOffset !== 0) {
+			this._seek(start + header.systemDataAlignmentOffset * 16);
+			const names = this._uint();
+			this._requireBytes(names);
+			for (let i = 0; i < names; i++) schema.names.push(this._readString());
+		}
+		return schema;
 	}
 }
