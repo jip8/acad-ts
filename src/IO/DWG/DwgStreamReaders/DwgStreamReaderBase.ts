@@ -807,7 +807,7 @@ export abstract class DwgStreamReaderBase implements IDwgStreamReader {
 		const unixTime = (jdate - 2440587.5) * 86400;
 
 		try {
-			const dt = new Date(unixTime * 1000 + milliseconds);
+			const dt = new Date(unixTime * 1000 + Math.max(0, milliseconds));
 			return dt;
 		} catch {
 			return new Date(0);

@@ -9,6 +9,8 @@ import { decodeCadString } from '../../TextEncoding.js';
 import { AcdsSchema } from '../../../DataStorage/AcdsSchema.js';
 import { AcdsSchemaRecord } from '../../../DataStorage/AcdsSchemaRecord.js';
 import { SchemaRecordFlags } from '../../../DataStorage/SchemaRecordFlags.js';
+import { AcdsRecord } from '../../../DataStorage/AcdsRecord.js';
+import { AcdsRecordColumn } from '../../../DataStorage/AcdsRecordColumn.js';
 
 interface FileHeader {
 	segmentIndexOffset: number;
@@ -47,6 +49,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			this._schemaIndex = this._readSchemaIndex();
 			this._readSchemaData(storage);
 			this._readDataIndex();
+			this._readDataFields(storage);
 			this._builder.dataStorage = storage;
 		} catch (error) {
 			if (!this._builder.configuration.failsafe) throw error;
@@ -220,5 +223,56 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			const schemaIndex = this._uint();
 			if (segmentIndex !== 0) this._dataIndex.push({ segmentIndex, localOffset, schemaIndex });
 		}
+	}
+
+	private _readDataFields(storage: CadFileDataStorage): void {
+		for (const index of new Set(this._dataIndex.map(e => e.segmentIndex))) {
+			const start = this._segmentOffset(index);
+			this._seek(start);
+			const segment = this._readSegmentHeader();
+			if (segment.segmentSize === 0) continue;
+			const headerEnd = this._reader.position;
+			const entries = this._dataIndex.filter(e => e.segmentIndex === index);
+			const headers = entries.map(entry => {
+				this._seek(headerEnd + entry.localOffset);
+				this._uint();
+				this._uint();
+				return { entry, handle: this._ulong(), localOffset: this._uint() };
+			});
+			const dataStart = start + segment.objectDataAlignmentOffset * 16;
+			for (let i = 0; i < headers.length; i++) {
+				const header = headers[i];
+				const next = headers[i + 1]?.localOffset ?? (segment.segmentSize - segment.objectDataAlignmentOffset * 16);
+				const maxSize = next - header.localOffset;
+				this._seek(dataStart + header.localOffset);
+				const size = this._uint();
+				if (size + 4 <= maxSize) {
+					this._storeData(storage, header.entry.schemaIndex, header.handle, this._bytes(size));
+				} else if (size === 0xbb106bb1) {
+					// Blob pages are parsed in the next upstream storage stage.
+					this._ulong();
+					const pages = this._uint();
+					this._bytes(20);
+					this._bytes(pages * 8);
+				} else {
+					throw new Error('Prototype1b record exceeds its segment');
+				}
+			}
+		}
+	}
+	private _storeData(storage: CadFileDataStorage, schemaIndex: number, handle: number, data: Uint8Array): void {
+		const schema = storage.schemes.find(s => s.index === schemaIndex);
+		if (!schema) throw new Error(`Prototype1b schema ${schemaIndex} not found`);
+		const record = new AcdsRecord();
+		record.index = schemaIndex;
+		for (const property of schema.embeddedRecords) {
+			const column = new AcdsRecordColumn();
+			column.name = property.name;
+			column.dataType = property.type;
+			if (property.name === CadFileDataStorage.id) { column.code = 320; column.value = handle; }
+			else if (property.name === CadFileDataStorage.asmData) { column.code = 310; column.value = data; }
+			record.columns.set(column.name, column);
+		}
+		storage.records.push(record);
 	}
 }

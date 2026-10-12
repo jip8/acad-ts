@@ -84,6 +84,7 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 		this._readAuxHeader();
 
 		this._builder.buildDocument();
+		this._builder.buildDataStorage();
 
 		return this._document;
 	}
