@@ -5,6 +5,8 @@ import { DxfSubclassMarker } from '../DxfSubclassMarker.js';
 import { ObjectType } from '../Types/ObjectType.js';
 import { ACadVersion } from '../ACadVersion.js';
 import type { BoundingBox } from '../Math/BoundingBox.js';
+import { DwgStreamReaderBase } from '../IO/DWG/DwgStreamReaders/DwgStreamReaderBase.js';
+import '../IO/DWG/DwgStreamReaders/DwgStreamReaderFactory.js';
 
 export class ProxyEntity extends Entity {
 	get classId(): number {
@@ -40,6 +42,11 @@ export class ProxyEntity extends Entity {
 	}
 
 	version: ACadVersion = ACadVersion.Unknown;
+
+	getStringDataText(): string {
+		if (this.stringData === null) return '';
+		return DwgStreamReaderBase.getStreamHandler(this.version, this.stringData).readVariableText();
+	}
 
 	override applyTransform(transform: unknown): void {
 		// No-op
