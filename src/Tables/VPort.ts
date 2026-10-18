@@ -15,11 +15,6 @@ import { ViewModeType } from './ViewModeType.js';
 import { XYZ } from '../Math/XYZ.js';
 import { XY } from '../Math/XY.js';
 
-function normalizeXYZ(v: XYZ): XYZ {
-	const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-	if (len === 0) return new XYZ(0, 0, 0);
-	return new XYZ(v.x / len, v.y / len, v.z / len);
-}
 
 export class VPort extends TableEntry {
 	public static readonly defaultName: string = '*Active';
@@ -56,7 +51,7 @@ export class VPort extends TableEntry {
 		return this._direction;
 	}
 	public set direction(value: XYZ) {
-		this._direction = normalizeXYZ(value);
+		this._direction = value;
 	}
 
 	public target: XYZ = new XYZ(0, 0, 0);
