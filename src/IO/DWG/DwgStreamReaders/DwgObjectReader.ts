@@ -2570,6 +2570,8 @@ export class DwgObjectReader extends DwgSectionIO {
       }
       proxy.originalDataFormatDxf = this._mergedReaders.readBit();
     }
+    const dataBits = this._objectDataEndInBits - this._objectReader.positionInBits();
+    if (dataBits > 0) proxy.data = this._objectReader.readBytes(Math.ceil(dataBits / 8));
   }
 
   // ==================== DICT / GROUP / XRECORD ====================

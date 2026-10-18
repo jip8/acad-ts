@@ -18,6 +18,7 @@ export class ProxyEntity extends Entity {
 	dxfClass: DxfClass | null = null;
 
 	maintenanceVersion: number = 0;
+	data: Uint8Array | null = null;
 
 	override get objectName(): string {
 		return DxfFileToken.entityProxyEntity;
