@@ -39,7 +39,7 @@ export class SeqendCollection<T extends CadObject> extends CadObjectCollection<T
 
 	public override remove(item: T): T | null {
 		const e = super.remove(item);
-		if (e != null) {
+		if (e != null && this._entries.size === 0) {
 			this.onSeqendRemoved?.(this, new CollectionChangedEventArgs(this._seqend));
 		}
 		return e;
