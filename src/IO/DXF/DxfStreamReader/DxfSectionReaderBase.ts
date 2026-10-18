@@ -906,6 +906,8 @@ export abstract class DxfSectionReaderBase {
             default:
               break;
           }
+          this.currentSubclass = tmp.cadObject instanceof DimensionLinear
+            ? DxfSubclassMarker.alignedDimension : tmp.cadObject.subclassMarker;
         }
         return true;
       }
@@ -953,8 +955,11 @@ export abstract class DxfSectionReaderBase {
           default:
             return false;
         }
-      default:
-        return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(tmp.cadObject.subclassMarker)!);
+      default: {
+        const target = map.subClasses.get(this.currentSubclass ?? '') ?? map.subClasses.get(tmp.cadObject.subclassMarker)!;
+        if (this.tryAssignCurrentValue(template.cadObject, target)) return true;
+        return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(DxfSubclassMarker.dimension)!);
+      }
     }
   }
 
