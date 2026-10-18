@@ -71,7 +71,7 @@ export class DxfTablesSectionReader extends DxfSectionReaderBase {
 
     while (this._reader.valueAsString !== DxfFileToken.endSection) {
       if (this._reader.valueAsString === DxfFileToken.tableEntry) {
-        this._readTable();
+        this.readTable();
       } else {
         throw new DxfException(`Unexpected token at the beginning of a table: ${this._reader.valueAsString}`, this._reader.position);
       }
@@ -84,7 +84,7 @@ export class DxfTablesSectionReader extends DxfSectionReaderBase {
     }
   }
 
-  private _readTable(): void {
+  public readTable(): void {
     // Debug.Assert(this._reader.ValueAsString == DxfFileToken.TableEntry);
 
     this._reader.readNext();
