@@ -926,7 +926,7 @@ export abstract class DxfSectionWriterBase {
       this._writer.writeCmColor(63, mtext.backgroundColor, subclass);
       this._writer.write(45, mtext.backgroundScale, subclass);
       if (mtext.backgroundColor.isTrueColor) this._writer.writeTrueColor(421, mtext.backgroundColor);
-      this._writer.write(441, Transparency.toAlphaValue(mtext.backgroundTransparency));
+      this._writer.write(441, mtext.backgroundTransparency);
       }
     }
   }
