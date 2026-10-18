@@ -9,6 +9,7 @@ import { DwgReader } from '../../src/IO/DWG/DwgReader.js';
 import { DwgWriter } from '../../src/IO/DWG/DwgWriter.js';
 import { ACadVersion } from '../../src/ACadVersion.js';
 import { CadDocument } from '../../src/CadDocument.js';
+import { XRecord } from '../../src/Objects/XRecrod.js';
 import { Dimension } from '../../src/Entities/Dimension.js';
 import { Mesh } from '../../src/Entities/Mesh.js';
 import { MultiLeader } from '../../src/Entities/MultiLeader.js';
@@ -133,9 +134,8 @@ describe('Roundtrip Tests', () => {
       const rereadData = readFileAsArrayBuffer(outPath);
       const reread = new DwgReader(rereadData);
       const doc2 = reread.read();
-      const xrecordTemplate = (reread as any)._builder.getObjectTemplate(3966) as { _entries: Array<[number, number]> };
-
-      expect(xrecordTemplate._entries).toContainEqual([330, 135]);
+      const xrecord = doc2.getCadObject(3966) as XRecord;
+      expect(xrecord.entries.map(entry => [entry.code, (entry.value as { handle?: number })?.handle ?? entry.value])).toContainEqual([330, 135]);
 
       const modelLayout = doc2.getCadObject(34) as Layout;
       expect(modelLayout.lastActiveViewport).toBeNull();
