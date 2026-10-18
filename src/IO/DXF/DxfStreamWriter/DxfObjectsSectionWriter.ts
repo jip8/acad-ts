@@ -637,6 +637,10 @@ export class DxfObjectsSectionWriter extends DxfSectionWriterBase {
     this._writer.write(280, record.cloningFlags);
 
     for (const e of record.entries) {
+      if (e.value == null) {
+        this.notify(`XRecord entry with code ${e.code} has a null value`, NotificationType.Warning);
+        continue;
+      }
       switch (e.groupCode) {
         case GroupCodeValueType.None:
           break;
