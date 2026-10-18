@@ -920,13 +920,12 @@ export abstract class DxfSectionWriterBase {
     this._writer.writeVector(11, mtext.alignmentPoint, subclass);
     this._writer.write(73, mtext.lineSpacingStyle, subclass);
     this._writer.write(44, mtext.lineSpacing, subclass);
-    this._writer.write(90, mtext.backgroundFillFlags, subclass);
-
-    if (mtext.backgroundFillFlags > 0) {
-      this._writer.write(63, mtext.backgroundColor.index);
+    if (this.version >= ACadVersion.AC1018 && mtext.backgroundFillFlags !== 0) {
+      this._writer.write(90, mtext.backgroundFillFlags, subclass);
+      this._writer.writeCmColor(63, mtext.backgroundColor, subclass);
       this._writer.write(45, mtext.backgroundScale, subclass);
-      this._writer.writeTrueColor(420, mtext.backgroundColor);
-      this._writer.write(441, mtext.backgroundTransparency);
+      if (mtext.backgroundColor.isTrueColor) this._writer.writeTrueColor(421, mtext.backgroundColor);
+      this._writer.write(441, Transparency.toAlphaValue(mtext.backgroundTransparency));
     }
   }
 

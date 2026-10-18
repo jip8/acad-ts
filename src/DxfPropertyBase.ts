@@ -81,6 +81,7 @@ export abstract class DxfPropertyBase {
 		if (currentValue instanceof Color) {
 			switch (code) {
 				case 62:
+				case 63:
 				case 70:
 				case 176:
 				case 177:
@@ -88,6 +89,7 @@ export abstract class DxfPropertyBase {
 					this.setPropertyValue(obj, new Color(toNumber(value)));
 					return;
 				case 90:
+				case 421:
 				case 420: {
 					const colorValue = toNumber(value) >>> 0;
 					const red = (colorValue >> 16) & 0xFF;
@@ -217,12 +219,14 @@ export abstract class DxfPropertyBase {
 		if (value instanceof Color) {
 			switch (code) {
 				case 62:
+				case 63:
 				case 70:
 				case 176:
 				case 177:
 				case 178:
 					return value.index;
 				case 420:
+				case 421:
 					return value.trueColor;
 				default:
 					return null;
