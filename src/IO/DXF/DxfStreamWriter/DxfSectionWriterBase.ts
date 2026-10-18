@@ -64,6 +64,8 @@ import { Wipeout } from '../../../Entities/Wipeout.js';
 import { Seqend } from '../../../Entities/Seqend.js';
 import { ModelerGeometry } from '../../../Entities/ModelerGeometry.js';
 import { Surface } from '../../../Entities/Surface.js';
+import { ProxyEntity } from '../../../Entities/ProxyEntity.js';
+import { ProxyGeometryWriter } from '../../ProxyGeometryWriter.js';
 import { Region } from '../../../Entities/Region.js';
 import { Solid3D } from '../../../Entities/Solid3D.js';
 import { AttributeBase } from '../../../Entities/AttributeBase.js';
@@ -381,6 +383,8 @@ export abstract class DxfSectionWriterBase {
       this._writeRay(entity, map);
     } else if (entity instanceof Shape) {
       this._writeShape(entity, map);
+    } else if (entity instanceof ProxyEntity) {
+      this._writeProxyEntity(entity);
     } else if (entity instanceof Region || entity instanceof Solid3D) {
       this._writeModelerGeometry(entity);
     } else if (entity instanceof Solid) {
@@ -412,6 +416,26 @@ export abstract class DxfSectionWriterBase {
       return false;
     }
     return true;
+  }
+
+  private _writeProxyEntity(proxy: ProxyEntity): void {
+    this._writer.write(100, DxfSubclassMarker.proxyEntity);
+    this._writer.write(90, proxy.proxyClassId);
+    this._writer.write(91, proxy.classId);
+    this._writer.write(71, proxy.version);
+    this._writer.write(97, proxy.maintenanceVersion);
+    this._writer.write(70, proxy.originalDataFormatDxf ? 1 : 0);
+    if (proxy.proxyGeometries.length) {
+      const graphics = ProxyGeometryWriter.writeGeometries(proxy.proxyGeometries);
+      this._writer.write(160, graphics.length);
+      this._writer.write(310, graphics);
+    }
+    this._writer.write(162, proxy.stringData?.length ?? 0);
+    if (proxy.stringData?.length) this._writer.write(311, proxy.stringData);
+    this._writer.write(161, proxy.binaryData?.length ?? 0);
+    if (proxy.binaryData?.length) this._writer.write(310, proxy.binaryData);
+    for (const handle of proxy.referencedObjectHandles) this._writer.write(330, handle);
+    this._writer.write(94, 0);
   }
 
   private _writeArc(arc: Arc, map: DxfMap): void {

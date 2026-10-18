@@ -7,6 +7,8 @@ import { ACadVersion } from '../ACadVersion.js';
 import type { BoundingBox } from '../Math/BoundingBox.js';
 import { DwgStreamReaderBase } from '../IO/DWG/DwgStreamReaders/DwgStreamReaderBase.js';
 import '../IO/DWG/DwgStreamReaders/DwgStreamReaderFactory.js';
+import { DwgStreamWriterBase } from '../IO/DWG/DwgStreamWriters/DwgStreamWriterBase.js';
+import '../IO/DWG/DwgStreamWriters/DwgStreamWriterFactory.js';
 
 export class ProxyEntity extends Entity {
 	get classId(): number {
@@ -46,6 +48,17 @@ export class ProxyEntity extends Entity {
 	getStringDataText(): string {
 		if (this.stringData === null) return '';
 		return DwgStreamReaderBase.getStreamHandler(this.version, this.stringData).readVariableText();
+	}
+
+	addStringDataText(text: string, encoding: string = 'utf-8'): void {
+		const buffer = new Uint8Array(text.length * 4 + 16);
+		const writer = DwgStreamWriterBase.getStreamWriter(this.version, buffer, encoding);
+		writer.writeVariableText(text);
+		const bytes = buffer.slice(0, Math.ceil(writer.positionInBits / 8));
+		const combined = new Uint8Array((this.stringData?.length ?? 0) + bytes.length);
+		if (this.stringData) combined.set(this.stringData);
+		combined.set(bytes, this.stringData?.length ?? 0);
+		this.stringData = combined;
 	}
 
 	override applyTransform(transform: unknown): void {
