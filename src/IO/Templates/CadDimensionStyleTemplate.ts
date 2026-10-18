@@ -61,10 +61,12 @@ export class CadDimensionStyleTemplate extends CadTableEntryTemplate<DimensionSt
 			this.cadObject.lineTypeExt2 = linetTypeEx2;
 		}
 
-		const leaderArrow = this.getTableReference(builder, this.dimldrblk, this.dimbL_Name ?? '', BlockRecord);
+		const leaderArrow = this.getTableReference(builder, this.dimldrblk, '', BlockRecord);
 		if (leaderArrow) {
 			this.cadObject.leaderArrow = leaderArrow;
 		}
+		const arrowBlock = this.getTableReference(builder, this.dimblk, this.dimbL_Name ?? '', BlockRecord);
+		if (arrowBlock) this.cadObject.arrowBlock = arrowBlock;
 
 		const dimArrow1 = this.getTableReference(builder, this.dimblk1, this.dimblK1_Name ?? '', BlockRecord);
 		if (dimArrow1) {
