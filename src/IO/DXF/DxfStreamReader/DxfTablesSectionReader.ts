@@ -250,8 +250,7 @@ export class DxfTablesSectionReader extends DxfSectionReaderBase {
         if (tableTemplate.cadObject.contains(template.name) && this._builder.configuration.failsafe) {
           this._builder.notify(`Duplicated entry with name ${template.name} found in ${template.cadObject.objectName}`, NotificationType.Warning);
 
-          tableTemplate.cadObject.remove(template.name);
-          tableTemplate.cadObject.add(entry);
+          continue;
         } else {
           tableTemplate.cadObject.add(entry);
         }
