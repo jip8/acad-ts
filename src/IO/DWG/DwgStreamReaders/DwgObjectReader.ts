@@ -2569,7 +2569,7 @@ export class DwgObjectReader extends DwgSectionIO {
         proxy.maintenanceVersion = this._mergedReaders.readBitLong();
       }
       proxy.originalDataFormatDxf = this._mergedReaders.readBit();
-    }
+    } else this._mergedReaders.readBitLong();
     const dataBits = this._objectDataEndInBits - this._objectReader.positionInBits();
     if (dataBits > 0) proxy.data = this._objectReader.readBytes(Math.ceil(dataBits / 8));
   }

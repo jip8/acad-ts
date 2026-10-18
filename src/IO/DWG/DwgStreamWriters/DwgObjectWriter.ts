@@ -1659,6 +1659,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeBitLong(proxy.classId);
 
 		if (!this.r2000Plus) {
+			this._writer.writeBitLong(proxy.dxfClass?.itemClassId ?? 0);
 			return;
 		}
 
