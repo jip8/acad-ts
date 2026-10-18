@@ -24,6 +24,8 @@ import { DwgSummaryInfoWriter } from './DwgStreamWriters/DwgSummaryInfoWriter.js
 import { ViewportEntityControl } from '../../Tables/Collections/ViewportEntityControl.js';
 import './DwgStreamWriters/DwgStreamWriterFactory.js';
 import { DwgOutputBufferTooSmallError } from '../../Exceptions/DwgOutputBufferTooSmallError.js';
+import { ModelerGeometry } from '../../Entities/ModelerGeometry.js';
+import { DwgPrototype1bWriter } from './DwgStreamWriters/DwgPrototype1bWriter.js';
 
 export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 	preview: DwgPreview | null = null;
@@ -243,6 +245,14 @@ export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 		this._handlesMap = writer.map;
 
 		this._fileHeaderWriter.addSection(DwgSectionDefinition.acDbObjects, writer.getWrittenData(), true);
+		if (this._version >= ACadVersion.AC1027) {
+			const geometry: ModelerGeometry[] = [];
+			for (const handle of writer.map.keys()) {
+				const object = this._document.getCadObject(handle);
+				if (object instanceof ModelerGeometry && object.binaryData.length > 0) geometry.push(object);
+			}
+			if (geometry.length > 0) this._fileHeaderWriter.addSection(DwgSectionDefinition.acDsPrototype, DwgPrototype1bWriter.write(geometry), true);
+		}
 	}
 
 	private _writeObjFreeSpace(): void {

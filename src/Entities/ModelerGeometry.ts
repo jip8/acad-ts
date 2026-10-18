@@ -47,6 +47,8 @@ export abstract class ModelerGeometry extends Entity {
 	/** @internal */ acisTextEncoded: boolean | null = null;
 
 	modelerFormatVersion: number = 0;
+	/** Undocumented bit preceding the inline ACIS version; retain it when rewriting. */
+	modelerDataFlag: boolean | null = null;
 	materialMappings: { arrayIndex: number; absoluteReference: number; materialHandle: number }[] = [];
 	revisionGuidPresent: boolean = false;
 	revisionMajor: number = 0;
@@ -62,12 +64,9 @@ export abstract class ModelerGeometry extends Entity {
 	set acisData(value: Uint8Array) { this.binaryData = value; }
 
 	get isBinaryAcisData(): boolean {
-		const signature = 'ACIS BinaryFile';
-		if (this.binaryData.length < signature.length) return false;
-		for (let i = 0; i < signature.length; i++) {
-			if (this.binaryData[i] !== signature.charCodeAt(i)) return false;
-		}
-		return true;
+		return ['ACIS BinaryFile', 'ASM BinaryFile'].some(signature =>
+			this.binaryData.length >= signature.length &&
+			[...signature].every((character, i) => this.binaryData[i] === character.charCodeAt(0)));
 	}
 
 	getAcisText(): string | null {

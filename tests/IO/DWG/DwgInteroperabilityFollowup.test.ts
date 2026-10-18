@@ -21,17 +21,58 @@ import { TestVariables } from '../../TestVariables.js';
 import { readFileAsArrayBuffer } from '../../testHelpers.js';
 
 describe('DWG interoperability follow-up to #11', () => {
-  for (const version of ['AC1018', 'AC1024']) {
-    it(`preserves inline ACIS geometry when rewriting ${version}`, () => {
+  for (const target of [ACadVersion.AC1018, ACadVersion.AC1024]) {
+    it(`preserves ASM binary geometry downgrading R2018 to ${ACadVersion[target]}`, () => {
+      const document = new DwgReader(readFileAsArrayBuffer(path.join(TestVariables.samplesFolder, 'sample_AC1032.dwg'))).read();
+      const geometry = [...document.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
+      expect(geometry).toHaveLength(3);
+      for (const entity of geometry) expect(entity.isBinaryAcisData).toBe(true);
+      document.header.version = target;
+      const bytes = DwgWriter.writeToBuffer(document);
+      const reread = new DwgReader(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)).read();
+      const actual = [...reread.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
+      const summary = (entity: ModelerGeometry) => ({ handle: entity.handle, payload: createHash('sha256').update(entity.binaryData).digest('hex') });
+      expect(actual.map(summary)).toEqual(geometry.map(summary));
+    });
+  }
+  for (const source of ['AC1014', 'AC1015']) {
+    for (const target of [ACadVersion.AC1027, ACadVersion.AC1032]) {
+      it(`preserves legacy ACIS flags and SAT text upgrading ${source} to ${ACadVersion[target]}`, () => {
+        const document = new DwgReader(readFileAsArrayBuffer(path.join(TestVariables.samplesFolder, `sample_${source}.dwg`))).read();
+        const geometry = [...document.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
+        expect(geometry).toHaveLength(3);
+        for (const entity of geometry) {
+          expect(entity.modelerDataFlag).toBe(true);
+          expect(entity.getAcisText()).toMatch(/^(?:106|400) (?:112|42) 1 0/);
+          expect(entity.binaryData).not.toContain(0x7f);
+        }
+        document.header.version = target;
+        const bytes = DwgWriter.writeToBuffer(document);
+        const reread = new DwgReader(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)).read();
+        const actual = [...reread.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
+        const summary = (entity: ModelerGeometry) => ({
+          handle: entity.handle,
+          payload: createHash('sha256').update(entity.binaryData).digest('hex'),
+        });
+        expect(actual.map(summary)).toEqual(geometry.map(summary));
+      });
+    }
+  }
+  for (const version of ['AC1014', 'AC1015', 'AC1018', 'AC1024', 'AC1027', 'AC1032']) {
+    it(`preserves modeler geometry when rewriting ${version}`, () => {
       const document = new DwgReader(readFileAsArrayBuffer(path.join(TestVariables.samplesFolder, `sample_${version}.dwg`))).read();
       const geometry = [...document.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
       expect(geometry).toHaveLength(3);
-      for (const entity of geometry) expect(entity.binaryData.length).toBeGreaterThan(0);
+      for (const entity of geometry) {
+        expect(entity.binaryData.length).toBeGreaterThan(0);
+        expect(entity.modelerDataFlag).toBe(version < 'AC1018' ? true : version < 'AC1027' ? false : null);
+      }
       const bytes = DwgWriter.writeToBuffer(document);
       const rewritten = new DwgReader(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)).read();
       const reread = [...rewritten.entities].filter((entity): entity is ModelerGeometry => entity instanceof ModelerGeometry);
       const digest = (entity: ModelerGeometry) => createHash('sha256').update(entity.binaryData).digest('hex');
       expect(reread.map(digest)).toEqual(geometry.map(digest));
+      expect(reread.map(entity => entity.modelerDataFlag)).toEqual(geometry.map(entity => entity.modelerDataFlag));
     });
   }
   for (const version of [ACadVersion.AC1018, ACadVersion.AC1032]) {
@@ -148,9 +189,9 @@ describe('DWG interoperability follow-up to #11', () => {
 });
 
 describe.skipIf(!process.env.ODA_FILE_CONVERTER)('ODA interoperability', () => {
-  it('audits originals and same-version public sample rewrites', () => {
+  it('audits originals and the public sample version matrix', () => {
     // Requires npm run build and an explicitly configured local converter.
-    execFileSync(process.execPath, ['tools/check-dwg-oda.mjs', process.env.ODA_FILE_CONVERTER!], {
+    execFileSync(process.execPath, ['tools/check-dwg-oda.mjs', process.env.ODA_FILE_CONVERTER!, '--matrix'], {
       cwd: process.cwd(), stdio: 'pipe', timeout: 300000, windowsHide: true,
     });
   }, 300000);

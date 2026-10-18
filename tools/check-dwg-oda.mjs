@@ -19,6 +19,19 @@ const originalInput = path.join(run, 'originals');
 const rewrittenInput = path.join(run, 'rewritten');
 for (const directory of [originalInput, rewrittenInput]) mkdirSync(directory);
 const results = [];
+// Acceptance alone can hide solids silently dropped by a converter. Compare
+// modeler entity handles with the independently converted original drawing.
+function modelerHandles(file) {
+  const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+  const handles = [];
+  let modeler = false;
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = lines[i].trim(), value = lines[i + 1].trim();
+    if (code === '0') modeler = ['3DSOLID', 'REGION', 'BODY'].includes(value);
+    if (modeler && code === '5') handles.push(value.toUpperCase());
+  }
+  return handles.sort();
+}
 for (const file of readdirSync(path.join(root, 'samples')).filter(name => /^sample_AC\d+\.dwg$/i.test(name))) {
   const source = path.join(root, 'samples', file);
   const bytes = readFileSync(source);
@@ -43,9 +56,9 @@ for (const file of readdirSync(path.join(root, 'samples')).filter(name => /^samp
       writerConfiguration.writeDynamicBlockData = dynamic;
       try {
         writeFileSync(path.join(rewrittenInput, outputName), DwgWriter.writeToBuffer(document, writerConfiguration, () => {}));
-        results.push({ file: outputName, kind: 'rewritten' });
+        results.push({ file: outputName, sourceFile: file, kind: 'rewritten' });
       } catch (error) {
-        results.push({ file: outputName, kind: 'rewritten', writeError: error.message });
+        results.push({ file: outputName, sourceFile: file, kind: 'rewritten', writeError: error.message });
       }
     }
   }
@@ -71,6 +84,15 @@ for (const [kind, input] of [['originals', originalInput], ['rewritten', rewritt
     const errors = outputFiles.filter(file => file.toLowerCase().startsWith(`${stem}.`) && /\.err$/i.test(file));
     result.passed = outputFiles.some(file => file.toLowerCase() === `${stem}.dxf`) && errors.length === 0;
     result.errors = errors.map(file => readFileSync(path.join(output, file), 'utf8'));
+    if (result.passed) {
+      const dxf = outputFiles.find(file => file.toLowerCase() === `${stem}.dxf`);
+      result.modelerHandles = modelerHandles(path.join(output, dxf));
+      if (kind === 'rewritten') {
+        const baseline = results.find(original => original.kind === 'originals' && original.file === result.sourceFile);
+        result.missingModelerHandles = (baseline.modelerHandles ?? []).filter(handle => !result.modelerHandles.includes(handle));
+        result.passed = baseline.passed && result.missingModelerHandles.length === 0;
+      }
+    }
   }
 }
 writeFileSync(path.join(run, 'results.json'), JSON.stringify(results, null, 2));

@@ -2277,10 +2277,13 @@ export class DwgObjectReader extends DwgSectionIO {
   private _readModelerGeometry(template: CadEntityTemplate): CadEntityTemplate {
     const geometry = template.cadObject as ModelerGeometry;
     this._readCommonEntityData(template);
-		const acisEmpty = this._mergedReaders.readBit();
-		if (!acisEmpty) {
+		// AcDs-backed entities start at the wireframe fields, without an inline
+		// empty/version/payload prefix. The builder attaches their stored bytes.
+		if (template.hasDsBinaryData) {
+			geometry.modelerFormatVersion = 2;
+		} else if (!this._mergedReaders.readBit()) {
 			this._readModelerGeometryData(template);
-    }
+		}
     const isWireframe = this._mergedReaders.readBit();
     if (isWireframe) {
       const hasPoint = this._mergedReaders.readBit();
@@ -2324,14 +2327,23 @@ export class DwgObjectReader extends DwgSectionIO {
         });
       }
     }
+    if (this.r2013Plus) {
+      geometry.revisionGuidPresent = this._mergedReaders.readBit();
+      geometry.revisionMajor = this._mergedReaders.readBitLong();
+      geometry.revisionMinor1 = this._mergedReaders.readBitShort();
+      geometry.revisionMinor2 = this._mergedReaders.readBitShort();
+      geometry.revisionBytes = this._mergedReaders.readBytes(8);
+      geometry.revisionEndMarker = this._mergedReaders.readBitLong();
+    }
     return template;
   }
 
   private _readModelerGeometryData(template: CadEntityTemplate): void {
 		const geometry = template.cadObject as ModelerGeometry;
-		this._mergedReaders.readBit();
+		geometry.modelerDataFlag = this._mergedReaders.readBit();
     const version = this._mergedReaders.readBitShort();
 		geometry.modelerFormatVersion = version;
+		if (template.hasDsBinaryData) return;
 		if (version === 1) {
 			const chunks: Uint8Array[] = [];
 			for (;;) {
@@ -2340,7 +2352,7 @@ export class DwgObjectReader extends DwgSectionIO {
 				if (length < 0 || length > 0x10000000) throw new Error(`Invalid SAT block length ${length}`);
 				const encoded = this._mergedReaders.readBytes(length);
 				for (let index = 0; index < encoded.length; index++) {
-					if (encoded[index]! >= 0x20 && encoded[index]! <= 0x7e) encoded[index] = 0x9f - encoded[index]!;
+					if (encoded[index]! > 0x20 && encoded[index]! < 0x9f) encoded[index] = 0x9f - encoded[index]!;
 					else if (encoded[index] === 0x09) encoded[index] = 0x20;
 				}
 				chunks.push(encoded);
@@ -2389,10 +2401,12 @@ export class DwgObjectReader extends DwgSectionIO {
 
 	private static _modelerPayloadLength(data: Uint8Array): number {
 		const binaryHeader = new TextEncoder().encode('ACIS BinaryFile');
+		const asmHeader = new TextEncoder().encode('ASM BinaryFile');
 		const encodedAcisEnd = new Uint8Array([0x45, 0x6e, 0x64, 0x0e, 0x02, 0x6f, 0x66, 0x0e, 0x04, 0x41, 0x43, 0x49, 0x53, 0x0d, 0x04, 0x64, 0x61, 0x74, 0x61]);
+		const encodedAsmEnd = new Uint8Array([0x45, 0x6e, 0x64, 0x0e, 0x02, 0x6f, 0x66, 0x0e, 0x03, 0x41, 0x53, 0x4d, 0x0d, 0x04, 0x64, 0x61, 0x74, 0x61]);
 		const plainEnds = [new TextEncoder().encode('End-of-ACIS-data'), new TextEncoder().encode('End-of-ASM-data')];
-		if (!DwgObjectReader._startsWith(data, binaryHeader)) return 0;
-		for (const marker of [encodedAcisEnd, ...plainEnds]) {
+		if (!DwgObjectReader._startsWith(data, binaryHeader) && !DwgObjectReader._startsWith(data, asmHeader)) return 0;
+		for (const marker of [encodedAcisEnd, encodedAsmEnd, ...plainEnds]) {
 			const index = DwgObjectReader._indexOfBytes(data, marker);
 			if (index >= 0) return index + marker.length;
 		}

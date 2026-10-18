@@ -238,7 +238,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 				this._uint();
 				this._uint();
 				return { entry, handle: this._ulong(), localOffset: this._uint() };
-			});
+			}).sort((a, b) => a.localOffset - b.localOffset);
 			const dataStart = start + segment.objectDataAlignmentOffset * 16;
 			for (let i = 0; i < headers.length; i++) {
 				const header = headers[i];

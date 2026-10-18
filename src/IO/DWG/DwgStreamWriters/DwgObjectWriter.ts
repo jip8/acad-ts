@@ -1469,7 +1469,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 
 		if (this.r2013Plus) {
-			this._writer.writeBit(false);
+			this._writer.writeBit(cadObject instanceof ModelerGeometry && cadObject.binaryData.length > 0);
 		}
 
 		if (!noDictionary) {
@@ -2818,10 +2818,11 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _writeModelerGeometry(geometry: ModelerGeometry): void {
 		const data = geometry.binaryData;
-		const version = geometry.isBinaryAcisData ? 2 : 1;
-		this._writer.writeBit(data.length === 0);
-		if (data.length > 0) {
-			this._writer.writeBit(false);
+		const storedInAcDs = this.r2013Plus && data.length > 0;
+		const version = storedInAcDs || geometry.isBinaryAcisData ? 2 : 1;
+		if (!storedInAcDs) this._writer.writeBit(data.length === 0);
+		if (data.length > 0 && !storedInAcDs) {
+			this._writer.writeBit(geometry.modelerDataFlag ?? version === 1);
 			this._writer.writeBitShort(version);
 			if (version === 2) {
 				this._writer.writeBytes(data);
@@ -2829,7 +2830,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 				for (let offset = 0; offset < data.length; offset += 4096) {
 					const block = data.slice(offset, offset + 4096);
 					for (let i = 0; i < block.length; i++) {
-						if (block[i] >= 0x20 && block[i] <= 0x7e) block[i] = 0x9f - block[i];
+						if (block[i] > 0x20 && block[i] < 0x9f) block[i] = 0x9f - block[i];
 					}
 					this._writer.writeBitLong(block.length);
 					this._writer.writeBytes(block);
