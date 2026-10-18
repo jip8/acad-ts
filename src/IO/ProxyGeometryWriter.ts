@@ -41,7 +41,19 @@ export class ProxyGeometryWriter {
 			if (geometry instanceof G.ProxyPolylineWithNormal) writer.point(geometry.normal);
 		} else if (geometry instanceof G.ProxyXLine) { writer.point(geometry.point1); writer.point(geometry.point2); }
 		else if (geometry instanceof G.ProxyRay) { writer.point(geometry.constructionLinePoint); writer.point(geometry.point2); }
-		else throw new Error(`Unsupported proxy geometry ${geometry.graphicsType}`);
+		else if (geometry instanceof G.ProxyMesh) {
+			writer.int(geometry.rowCount); writer.int(geometry.columnCount);
+			for (const vertex of geometry.vertices) writer.point(vertex);
+			writer.bytes(geometry.traitsData.length ? geometry.traitsData : new Uint8Array(12));
+		} else if (geometry instanceof G.ProxyShell) {
+			writer.points(geometry.vertices);
+			writer.int(geometry.faces.reduce((sum, face) => sum + face.length + 1, 0));
+			for (const face of geometry.faces) { writer.int(face.length); for (const index of face) writer.int(index); }
+			writer.bytes(geometry.traitsData.length ? geometry.traitsData : new Uint8Array(12));
+		} else if (geometry instanceof G.ProxyScalarGeometry) {
+			if (geometry.graphicsType === G.GraphicsType.SubentLineTypeScale || geometry.graphicsType === G.GraphicsType.SubentThickness) writer.double(geometry.value);
+			else { writer.int(geometry.value); if (geometry.secondaryValue !== undefined) writer.int(geometry.secondaryValue); }
+		} else throw new Error(`Unsupported proxy geometry ${geometry.graphicsType}`);
 		return writer.result();
 	}
 }
