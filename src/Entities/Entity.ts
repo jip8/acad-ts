@@ -62,6 +62,7 @@ export abstract class Entity extends CadObject implements IEntity {
 	}
 
 	proxyGeometries: IProxyGeometry[] = [];
+	get hasProxyGeometries(): boolean { return this.proxyGeometries.length > 0; }
 
 	override get subclassMarker(): string {
 		return DxfSubclassMarker.entity;

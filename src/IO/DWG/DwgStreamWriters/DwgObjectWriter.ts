@@ -53,6 +53,7 @@ import { Solid } from '../../../Entities/Solid.js';
 import { Solid3D } from '../../../Entities/Solid3D.js';
 import { ModelerGeometry, ModelerGeometryWire } from '../../../Entities/ModelerGeometry.js';
 import { Surface } from '../../../Entities/Surface.js';
+import { ProxyGeometryWriter } from '../../ProxyGeometryWriter.js';
 import { Spline, SplineFlags, SplineFlags1, KnotParametrization } from '../../../Entities/Spline.js';
 import { CadWipeoutBase, ClipType, ClipMode } from '../../../Entities/CadWipeoutBase.js';
 import { TextEntity, TextMirrorFlag, TextHorizontalAlignment, TextVerticalAlignmentType } from '../../../Entities/TextEntity.js';
@@ -1260,7 +1261,13 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _writeCommonEntityData(entity: Entity): void {
 		this._writeCommonData(entity);
-		this._writer.writeBit(false);
+		const graphics = entity.proxyGeometries.length ? ProxyGeometryWriter.writeGeometries(entity.proxyGeometries) : null;
+		this._writer.writeBit(graphics !== null);
+		if (graphics) {
+			if (this.r2010Plus) this._writer.writeBitLongLong(graphics.length);
+			else this._writer.writeRawLong(graphics.length);
+			this._writer.writeBytes(graphics);
+		}
 
 		if (this._version >= ACadVersion.AC1012 && this._version <= ACadVersion.AC1014) {
 			this._writer.savePositonForSize();
