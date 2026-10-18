@@ -46,7 +46,7 @@ export class MText extends Entity implements IText {
 
 	attachmentPoint: AttachmentPointType = AttachmentPointType.TopLeft;
 
-	backgroundColor: Color | null = null;
+	backgroundColor: Color | null = Color.byBlock;
 
 	backgroundFillFlags: BackgroundFillFlags = BackgroundFillFlags.None;
 
