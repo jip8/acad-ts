@@ -127,7 +127,7 @@ export class DxfTablesSectionReader extends DxfSectionReaderBase {
       }
     } else if (this._reader.valueAsString === DxfFileToken.endTable) {
       return;
-    } else {
+    } else if (this._reader.dxfCode !== DxfCode.Start) {
       this._reader.readNext();
     }
 
