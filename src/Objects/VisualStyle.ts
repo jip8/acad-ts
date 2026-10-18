@@ -20,7 +20,11 @@ export class VisualStyle extends NonGraphicalObject {
 	displaySettings: number = 0;
 
 	edgeApplyStyleFlag: number = 0;
-	edgeColor: number = 0;
+	private _edgeColorValue: Color = Color.byBlock;
+	get edgeColor(): number { return this._edgeColorValue.getApproxIndex(); }
+	set edgeColor(value: number) { this._edgeColorValue = new Color(value); }
+	get edgeColorValue(): Color { return this._edgeColorValue; }
+	set edgeColorValue(value: Color) { this._edgeColorValue = value; }
 	edgeCreaseAngle: number = 0;
 	edgeIntersectionColor: Color = Color.byLayer;
 	edgeIntersectionLineType: number = 0;
@@ -58,6 +62,19 @@ export class VisualStyle extends NonGraphicalObject {
 	override get subclassMarker(): string { return DxfSubclassMarker.visualStyle; }
 
 	type: number = 0;
+
+	/** DWG operation codes and version-specific properties retained during rewrites. */
+	dwgLightingModel: number = 2;
+	dwgLegacyUnknown: number = 0;
+	dwgPropertyOperations: number[] = [];
+	dwgExtendedProperties: { value: number | boolean | string | Color; operation: number }[] = [];
+
+	override clone(): VisualStyle {
+		const clone = super.clone() as VisualStyle;
+		clone.dwgPropertyOperations = [...this.dwgPropertyOperations];
+		clone.dwgExtendedProperties = this.dwgExtendedProperties.map(property => ({ ...property }));
+		return clone;
+	}
 
 	static readonly defaultName = '2dWireframe';
 }

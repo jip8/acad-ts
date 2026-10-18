@@ -4,6 +4,8 @@ import * as path from 'path';
 import { TestVariables } from '../TestVariables.js';
 import { readFileAsArrayBuffer, readFileAsUint8Array } from '../testHelpers.js';
 import { CadDocument } from '../../src/CadDocument.js';
+import { ACadVersion } from '../../src/ACadVersion.js';
+import { CadNotSupportedException } from '../../src/Exceptions/CadNotSupportedException.js';
 import { DwgReader } from '../../src/IO/DWG/DwgReader.js';
 import { DwgWriter } from '../../src/IO/DWG/DwgWriter.js';
 import { DxfReader } from '../../src/IO/DXF/DxfReader.js';
@@ -182,6 +184,11 @@ describe('Samples folder rewrite', () => {
 
       if (sample.extension === '.dwg') {
         const doc = new DwgReader(readFileAsArrayBuffer(sample.fullPath)).read();
+        if (doc.header.version === ACadVersion.AC1021) {
+          expect(() => writeDwg(doc, outPath)).toThrow(CadNotSupportedException);
+          expect(fs.existsSync(outPath)).toBe(false);
+          return;
+        }
         writeDwg(doc, outPath);
         expectWrittenFile(outPath);
         return;

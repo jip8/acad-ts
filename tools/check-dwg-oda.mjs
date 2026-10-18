@@ -1,0 +1,64 @@
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { ACadVersion, DwgReader, DwgReaderConfiguration, DwgWriter, DwgWriterConfiguration } from '../dist/index.js';
+
+// Run after npm run build. Each run uses fresh directories to avoid stale DXFs
+// giving false positives. ODA can return success even when a drawing fails.
+const converter = process.argv[2];
+if (!converter) {
+  console.error('Usage: node tools/check-dwg-oda.mjs <ODAFileConverter executable | --generate-only>');
+  process.exit(2);
+}
+const root = fileURLToPath(new URL('../', import.meta.url));
+mkdirSync(path.join(root, 'output'), { recursive: true });
+const run = mkdtempSync(path.join(root, 'output', 'oda-check-'));
+const originalInput = path.join(run, 'originals');
+const rewrittenInput = path.join(run, 'rewritten');
+for (const directory of [originalInput, rewrittenInput]) mkdirSync(directory);
+const results = [];
+for (const file of readdirSync(path.join(root, 'samples')).filter(name => /^sample_AC\d+\.dwg$/i.test(name))) {
+  const source = path.join(root, 'samples', file);
+  const bytes = readFileSync(source);
+  for (const dynamic of [false, true]) {
+    const configuration = new DwgReaderConfiguration();
+    configuration.keepUnknownEntities = true;
+    configuration.keepUnknownNonGraphicalObjects = true;
+    const document = DwgReader.readFromStreamWithConfig(
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), configuration, () => {},
+    );
+    if (document.header.version < ACadVersion.AC1014 || document.header.version === ACadVersion.AC1021) continue;
+    const outputName = file.replace(/\.dwg$/i, dynamic ? '-dynamic.dwg' : '-default.dwg');
+    const writerConfiguration = new DwgWriterConfiguration();
+    writerConfiguration.writeDynamicBlockData = dynamic;
+    writeFileSync(path.join(rewrittenInput, outputName), DwgWriter.writeToBuffer(document, writerConfiguration, () => {}));
+    results.push({ file: outputName, kind: 'rewritten' });
+  }
+  copyFileSync(source, path.join(originalInput, file));
+  results.push({ file, kind: 'originals' });
+}
+console.log(`Generated DWGs: ${run}`);
+if (converter === '--generate-only') process.exit(0);
+
+for (const [kind, input] of [['originals', originalInput], ['rewritten', rewrittenInput]]) {
+  const output = path.join(run, `${kind}-dxf`);
+  mkdirSync(output);
+  const conversion = spawnSync(converter, [input, output, 'ACAD2018', 'DXF', '0', '1', '*.DWG'], {
+    encoding: 'utf8', timeout: 300000, windowsHide: true,
+  });
+  if (conversion.error || conversion.status !== 0) {
+    console.error(conversion.error?.message ?? conversion.stderr ?? `ODA exited ${conversion.status}`);
+    process.exit(1);
+  }
+  const outputFiles = readdirSync(output);
+  for (const result of results.filter(result => result.kind === kind)) {
+    const stem = result.file.replace(/\.dwg$/i, '').toLowerCase();
+    const errors = outputFiles.filter(file => file.toLowerCase().startsWith(`${stem}.`) && /\.err$/i.test(file));
+    result.passed = outputFiles.some(file => file.toLowerCase() === `${stem}.dxf`) && errors.length === 0;
+    result.errors = errors.map(file => readFileSync(path.join(output, file), 'utf8'));
+  }
+}
+writeFileSync(path.join(run, 'results.json'), JSON.stringify(results, null, 2));
+for (const result of results) console.log(`${result.passed ? 'PASS' : 'FAIL'} ${result.kind}/${result.file}`);
+process.exitCode = results.every(result => result.passed) ? 0 : 1;

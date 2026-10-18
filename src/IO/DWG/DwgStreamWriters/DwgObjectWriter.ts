@@ -194,6 +194,7 @@ import { Material, ColorMethod, MapSource } from '../../../Objects/Material.js';
 import { UnknownNonGraphicalObject } from '../../../Objects/UnknownNonGraphicalObject.js';
 import { VisualStyle } from '../../../Objects/VisualStyle.js';
 import { TableStyle } from '../../../Objects/TableStyle.js';
+import { writeDwgVisualStyle } from '../DwgVisualStyle.js';
 import { ProxyObject } from '../../../Objects/ProxyObject.js';
 import { BlockRepresentationData } from '../../../Objects/BlockRepresentationData.js';
 import { BlockReferenceObjectContextData } from '../../../Objects/BlockReferenceObjectContextData.js';
@@ -220,7 +221,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 	writeDynamicBlockData: boolean;
 
 	private _dictionaries: Map<number, CadDictionary> = new Map();
-	private _objects: NonGraphicalObject[] = [];
+	private _objects: CadObject[] = [];
 
 	private _msmain: Uint8Array;
 	private _msmainPos: number = 0;
@@ -1422,13 +1423,13 @@ export class DwgObjectWriter extends DwgSectionIO {
 					for (let i = 0; i < textBytes.length; i++) chunks.push(textBytes[i]);
 					chunks.push(0, 0);
 				} else {
-					const encodingIndex = CadUtils.getCodeIndex(CadUtils.getCodePage(this._writer.encoding));
+					const encodingIndex = CadUtils.getCodeIndex(CadUtils.getCodePage(this._document.header.codePage));
 					const textBytes = this._encodeText(record.value || '');
-					const buf = new ArrayBuffer(2);
-					new DataView(buf).setUint16(0, textBytes.length, true);
-					const lenBytes = new Uint8Array(buf);
-					chunks.push(lenBytes[0], lenBytes[1]);
-					chunks.push(encodingIndex);
+					if (textBytes.length > 255) {
+						throw new Error('Legacy DWG extended-data strings cannot exceed 255 encoded bytes.');
+					}
+					// EED is RC length + RS big-endian codepage (unlike XRECORD strings).
+					chunks.push(textBytes.length, (encodingIndex >>> 8) & 0xFF, encodingIndex & 0xFF);
 					for (let i = 0; i < textBytes.length; i++) chunks.push(textBytes[i]);
 				}
 			} else {
@@ -1631,7 +1632,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 	}
 
-	private _enqueueObject(object: NonGraphicalObject | null | undefined): void {
+	private _enqueueObject(object: CadObject | null | undefined): void {
 		if (object == null || object.handle === 0) {
 			return;
 		}
@@ -2817,7 +2818,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 
 		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, image.definition);
-		this._writer.handleReference(image.definitionReactor);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardOwnership, image.definitionReactor);
 
 		if (image.definitionReactor != null) {
 			this._objects.push(image.definitionReactor);
@@ -3187,7 +3188,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 	}
 
-	private _skipEntry(entry: NonGraphicalObject): { skip: boolean; notify: boolean } {
+	private _skipEntry(entry: CadObject): { skip: boolean; notify: boolean } {
 		if (entry instanceof XRecord && !this.writeXRecords) return { skip: true, notify: false };
 		if (!this.writeDynamicBlockData && (
 			entry instanceof EvaluationGraph ||
@@ -3216,7 +3217,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 	}
 
-	private _writeObject(obj: NonGraphicalObject): void {
+	private _writeObject(obj: CadObject): void {
 		const validationErrors = obj.validate(CadFileFormat.DWG, this._version);
 		if (validationErrors.length > 0) {
 			this.notify(`Invalid object ${obj.constructor.name}: ${validationErrors.join(' ')}`, NotificationType.Warning);
@@ -3484,7 +3485,11 @@ export class DwgObjectWriter extends DwgSectionIO {
 			this._writer.writeBitLong(node.index);
 			this._writer.writeBitLong(node.flags);
 			this._writer.writeBitLong(node.nextNodeIndex);
-			this._writer.handleReference(node.expression ?? 0);
+			this._writer.handleReferenceTyped(DwgReferenceType.HardOwnership, node.expression);
+			if (node.expression != null) {
+				node.expression.owner ??= evaluationGraph;
+				this._enqueueObject(node.expression);
+			}
 			this._writer.writeBitLong(node.data1);
 			this._writer.writeBitLong(node.data2);
 			this._writer.writeBitLong(node.data3);
@@ -3506,30 +3511,29 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _writeVisualStyle(visualStyle: VisualStyle): void {
-		this._writer.writeVariableText(visualStyle.name);
-		this._writer.writeBitLong(visualStyle.type);
-		this._writer.writeBitShort(0);
-		this._writer.writeBit(visualStyle.internalFlag);
-		this._writer.writeBitLong(0);
+		writeDwgVisualStyle(this._writer, this._version, visualStyle);
 	}
 
 	private _writeTableStyle(tableStyle: TableStyle): void {
-		if (this.r2007Plus) {
-			const cellStyles = tableStyle.cellStyles.length > 0
-				? tableStyle.cellStyles
-				: [tableStyle.dataCellStyle, tableStyle.titleCellStyle, tableStyle.headerCellStyle];
+		// R2007 still uses row styles; the cell-style layout starts in R2010.
+		if (this.r2010Plus) {
+			const cellStyles = [...new Set([
+				tableStyle.titleCellStyle, tableStyle.headerCellStyle, tableStyle.dataCellStyle,
+				...tableStyle.cellStyles,
+			])];
 			this._writer.writeByte(0);
 			this._writer.writeVariableText(tableStyle.description);
 			this._writer.writeBitLong(0);
 			this._writer.writeBitLong(0);
-			this._writer.handleReference(0);
+			this._writer.handleReferenceTyped(DwgReferenceType.HardOwnership, null);
 			this._writeCellStyle(tableStyle.tableCellStyle);
 			this._writer.writeBitLong(tableStyle.tableCellStyle.id);
 			this._writer.writeBitLong(tableStyle.tableCellStyle.styleClass);
 			this._writer.writeVariableText(tableStyle.tableCellStyle.name);
 			this._writer.writeBitLong(cellStyles.length);
-			for (const cellStyle of cellStyles) {
-				this._writer.writeBitLong(0);
+			for (let i = 0; i < cellStyles.length; i++) {
+				const cellStyle = cellStyles[i];
+				this._writer.writeBitLong(i < 3 ? i + 1 : i + 98);
 				this._writeCellStyle(cellStyle);
 				this._writer.writeBitLong(cellStyle.id);
 				this._writer.writeBitLong(cellStyle.styleClass);
@@ -3560,7 +3564,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _writeRowCellStyle(style: CellStyle): void {
-		this._writer.handleReference(style.textStyle);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, style.textStyle);
 		this._writer.writeBitDouble(style.textHeight);
 		this._writer.writeBitShort(style.cellAlignment);
 		this._writeTableStyleColor(style.textColor);
@@ -3572,6 +3576,11 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writeBorderStyle(style.leftBorder);
 		this._writeBorderStyle(style.verticalInsideBorder);
 		this._writeBorderStyle(style.rightBorder);
+		if (this.r2007Plus) {
+			this._writer.writeBitLong(style.valueDataType);
+			this._writer.writeBitLong(style.valueUnitType);
+			this._writer.writeVariableText(style.valueFormatString);
+		}
 	}
 
 	private _writeBorderStyle(border: CellBorder): void {
@@ -3623,7 +3632,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeBitLong(border.type);
 		this._writer.writeCmColor(border.color);
 		this._writer.writeBitLong(border.lineWeight);
-		this._writer.handleReference(0);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, border.lineType);
 		this._writer.writeBitLong(border.isInvisible ? 1 : 0);
 		this._writer.writeBitDouble(border.doubleLineSpacing);
 	}
@@ -3638,7 +3647,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeBitDouble(format.scale);
 		this._writer.writeBitLong(format.alignment);
 		this._writer.writeCmColor(format.color);
-		this._writer.handleReference(format.textStyle);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, format.textStyle);
 		this._writer.writeBitDouble(format.textHeight);
 	}
 

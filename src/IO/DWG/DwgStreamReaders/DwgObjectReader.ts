@@ -194,6 +194,7 @@ import { WipeoutVariables } from '../../../Objects/WipeoutVariables.js';
 import { Scale } from '../../../Objects/Scale.js';
 import { SortEntitiesTable } from '../../../Objects/SortEntitiesTable.js';
 import { TableStyle, TableFlowDirectionType } from '../../../Objects/TableStyle.js';
+import { readDwgVisualStyle } from '../DwgVisualStyle.js';
 import { TableContent } from '../../../Objects/TableContent.js';
 import { VisualStyle } from '../../../Objects/VisualStyle.js';
 import { XRecord } from '../../../Objects/XRecrod.js';
@@ -257,6 +258,7 @@ import { UnknownNonGraphicalObject } from '../../../Objects/UnknownNonGraphicalO
 import { Color } from '../../../Color.js';
 import { Transparency } from '../../../Transparency.js';
 import { CadUtils } from '../../../CadUtils.js';
+import { decodeCadString } from '../../TextEncoding.js';
 import { XY } from '../../../Math/XY.js';
 import { XYZ } from '../../../Math/XYZ.js';
 import { Matrix4 } from '../../../Math/Matrix4.js';
@@ -591,7 +593,13 @@ export class DwgObjectReader extends DwgSectionIO {
       switch (dxfCode) {
         case DxfCode.ExtendedDataAsciiString:
         case DxfCode.ExtendedDataRegAppName:
-          record = new ExtendedDataString(this._objectReader.readTextUnicode());
+          if (this.r2007Plus) {
+            record = new ExtendedDataString(this._objectReader.readTextUnicode());
+          } else {
+            const length = this._objectReader.readByte();
+            const codePageIndex = this._objectReader.readShortBigEndian();
+            record = new ExtendedDataString(decodeCadString(this._objectReader.readBytes(length), CadUtils.getCodePage(codePageIndex)));
+          }
           break;
         case DxfCode.ExtendedDataControlString:
           record = new ExtendedDataControlString(this._objectReader.readByte() === 1);
@@ -3669,15 +3677,7 @@ export class DwgObjectReader extends DwgSectionIO {
     const visualStyle = new VisualStyle();
     const template = new CadNonGraphicalObjectTemplate(visualStyle);
     this._readCommonNonEntityData(template);
-    visualStyle.name = this._textReader.readVariableText();
-    visualStyle.type = this._objectReader.readBitLong();
-    const styleFlags = this._objectReader.readBitShort();
-    visualStyle.internalFlag = this._objectReader.readBit();
-    const payloadCount = this._objectReader.readBitLong();
-    this._builder.notify(
-      `DWG VisualStyle payload is only partially mapped; preserving base object data for ${visualStyle.name} with flags ${styleFlags} and ${payloadCount} payload entries.`,
-      NotificationType.Warning,
-    );
+    readDwgVisualStyle(this._mergedReaders, this._version, visualStyle);
     return template;
   }
 

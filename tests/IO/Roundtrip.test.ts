@@ -456,7 +456,7 @@ describe('Roundtrip Tests', () => {
         expect(doc).not.toBeNull();
 
         // Skip versions the DWG writer doesn't support
-        if (doc.header.version < ACadVersion.AC1014) return;
+        if (doc.header.version < ACadVersion.AC1014 || doc.header.version === ACadVersion.AC1021) return;
 
         // 2. Write
         const buffer = new ArrayBuffer(16 * 1024 * 1024);

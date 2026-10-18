@@ -9,11 +9,11 @@ export class TableStyle extends NonGraphicalObject {
 	static get default_(): TableStyle { return new TableStyle(TableStyle.defaultName); }
 
 	cellStyles: CellStyle[] = [];
-	dataCellStyle: CellStyle = new CellStyle();
+	dataCellStyle: CellStyle = TableStyle.createDefaultCellStyle('_Data', 3);
 	description: string = '';
 	flags: number = 0;
 	flowDirection: TableFlowDirectionType = TableFlowDirectionType.Down;
-	headerCellStyle: CellStyle = new CellStyle();
+	headerCellStyle: CellStyle = TableStyle.createDefaultCellStyle('_Header', 2);
 	horizontalCellMargin: number = 0.06;
 
 	override get objectName(): string { return DxfFileToken.objectTableStyle; }
@@ -23,7 +23,7 @@ export class TableStyle extends NonGraphicalObject {
 	suppressHeaderRow: boolean = false;
 	suppressTitle: boolean = false;
 	tableCellStyle: CellStyle = TableStyle.createDefaultCellStyle('Table', 4);
-	titleCellStyle: CellStyle = new CellStyle();
+	titleCellStyle: CellStyle = TableStyle.createDefaultCellStyle('_Title', 1);
 	verticalCellMargin: number = 0.06;
 
 	static readonly defaultName = 'Standard';

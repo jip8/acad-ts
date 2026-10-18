@@ -312,7 +312,7 @@ export class CellStyle extends ContentFormat {
 	styleClass: CellStyleClass = CellStyleClass.Data;
 	tableCellStylePropertyFlags: TableCellStylePropertyFlags = 0;
 	textColor: Color = Color.byBlock;
-	topBorder: CellBorder = new CellBorder(CellEdgeFlags.Right);
+	topBorder: CellBorder = new CellBorder(CellEdgeFlags.Top);
 	cellStyleType: CellStyleType = CellStyleType.Unknown;
 	verticalInsideBorder: CellBorder = new CellBorder(CellEdgeFlags.InsideVertical);
 	verticalMargin: number = 0.06;

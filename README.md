@@ -27,10 +27,14 @@ Last compared upstream commit: https://github.com/DomCR/ACadSharp/commit/014e9e8
 | AC1014 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1015 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1018 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| AC1021 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| AC1021 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :x: |
 | AC1024 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1027 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1032 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+
+R2007 (AC1021) DWG writing is unsupported and throws `CadNotSupportedException`.
+Earlier releases wrote an R2004 container with an R2007 signature, which external CAD engines reject.
+Choose AC1018 or AC1024 and later when exporting DWG. See [DWG interoperability validation](docs/dwg-interoperability.md).
 
 ## Installation
 

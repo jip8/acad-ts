@@ -35,7 +35,7 @@ const versions = [
 
 function isSupportedVersion(version: ACadVersion): boolean {
   // AC1012 and below are not supported for writing
-  return version >= ACadVersion.AC1014;
+  return version >= ACadVersion.AC1014 && version !== ACadVersion.AC1021;
 }
 
 describe('DwgWriterTests', () => {
@@ -187,7 +187,7 @@ describe('DwgWriterTests', () => {
   });
 
   it('WriteProxyEntityRoundtrip', () => {
-    const version = ACadVersion.AC1021;
+    const version = ACadVersion.AC1024;
     const doc = new CadDocument();
     doc.createDefaults();
     doc.header.version = version;

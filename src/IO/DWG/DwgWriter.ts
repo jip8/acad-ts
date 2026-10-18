@@ -131,9 +131,9 @@ export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 				this._fileHeaderWriter = new DwgFileHeaderWriterAC18(output, this._encoding, this._document);
 				break;
 			case ACadVersion.AC1021:
-				// AC1021 writer currently uses AC18-compatible section/page layout.
-				this._fileHeaderWriter = new DwgFileHeaderWriterAC18(output, this._encoding, this._document);
-				break;
+				// R2007 requires its own container, including Reed-Solomon encoding.
+				// An AC18 container with an AC1021 signature is not a valid R2007 DWG.
+				throw new CadNotSupportedException(this._version);
 			case ACadVersion.AC1024:
 			case ACadVersion.AC1027:
 			case ACadVersion.AC1032:

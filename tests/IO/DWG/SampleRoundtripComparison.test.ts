@@ -33,7 +33,7 @@ function hasDotnet(): boolean {
 
 function writeTsRoundtrip(inputPath: string, outputPath: string): void {
 	const doc = new DwgReader(readFileAsArrayBuffer(inputPath)).read();
-	if (doc.header.version < ACadVersion.AC1014) {
+	if (doc.header.version < ACadVersion.AC1014 || doc.header.version === ACadVersion.AC1021) {
 		return;
 	}
 
