@@ -1581,7 +1581,29 @@ export abstract class DxfSectionReaderBase {
         template.proxyGraphics = this._readProxyBytes(310);
         return true;
       case 161:
+        proxy.binaryData = this._readProxyBytes(310);
+        return true;
       case 162:
+        proxy.stringData = this._readProxyBytes(311);
+        return true;
+      case 330:
+      case 340:
+      case 350:
+      case 360:
+        if (this.currentSubclass === DxfSubclassMarker.proxyEntity) {
+          proxy.referencedObjectHandles.push(this._reader.valueAsHandle);
+          return true;
+        }
+        return false;
+      case 100:
+        this.currentSubclass = this._reader.valueAsString;
+        return true;
+      case 71: proxy.version = this._reader.valueAsShort as ACadVersion; return true;
+      case 97: proxy.maintenanceVersion = this._reader.valueAsShort; return true;
+      case 95:
+        proxy.version = (this._reader.valueAsInt & 0xFFFF) as ACadVersion;
+        proxy.maintenanceVersion = this._reader.valueAsInt >>> 16;
+        return true;
       case 94: return true;
       default: return this.tryAssignCurrentValue(proxy, map.subClasses.get(DxfSubclassMarker.proxyEntity)!);
     }
