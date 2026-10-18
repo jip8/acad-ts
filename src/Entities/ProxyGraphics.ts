@@ -15,6 +15,17 @@ export enum GraphicsType {
 
 export interface IProxyGeometry { readonly graphicsType: GraphicsType; }
 
+export function cloneProxyGeometry<T>(value: T): T {
+	if (value instanceof Uint8Array) return value.slice() as T;
+	if (Array.isArray(value)) return value.map(item => cloneProxyGeometry(item)) as T;
+	if (value !== null && typeof value === 'object') {
+		const copy = Object.create(Object.getPrototypeOf(value)) as Record<string, unknown>;
+		for (const [key, item] of Object.entries(value)) copy[key] = cloneProxyGeometry(item);
+		return copy as T;
+	}
+	return value;
+}
+
 export class ProxyRawGeometry implements IProxyGeometry {
 	constructor(public readonly graphicsType: GraphicsType, public readonly data: Uint8Array) {}
 }

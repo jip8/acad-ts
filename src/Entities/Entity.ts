@@ -16,6 +16,7 @@ import { XYZ } from '../Math/XYZ.js';
 import { XY } from '../Math/XY.js';
 import { Transform } from '../Math/Transform.js';
 import type { IProxyGeometry } from './ProxyGraphics.js';
+import { cloneProxyGeometry } from './ProxyGraphics.js';
 
 function isBlockRecordOwner(value: unknown): value is BlockRecord {
 	return value != null && typeof value === 'object' && 'blockEntity' in value;
@@ -97,7 +98,7 @@ export abstract class Entity extends CadObject implements IEntity {
 		clone._layer = this.layer.clone() as Layer;
 		clone._lineType = this.lineType.clone() as LineType;
 		clone.material = this.material?.clone?.() as Material | null ?? null;
-		clone.proxyGeometries = [...this.proxyGeometries];
+		clone.proxyGeometries = this.proxyGeometries.map(geometry => cloneProxyGeometry(geometry));
 
 		return clone;
 	}
