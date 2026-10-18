@@ -922,10 +922,12 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(44, mtext.lineSpacing, subclass);
     if (this.version >= ACadVersion.AC1018 && mtext.backgroundFillFlags !== 0) {
       this._writer.write(90, mtext.backgroundFillFlags, subclass);
+      if ((mtext.backgroundFillFlags & 0x11) !== 0) {
       this._writer.writeCmColor(63, mtext.backgroundColor, subclass);
       this._writer.write(45, mtext.backgroundScale, subclass);
       if (mtext.backgroundColor.isTrueColor) this._writer.writeTrueColor(421, mtext.backgroundColor);
       this._writer.write(441, Transparency.toAlphaValue(mtext.backgroundTransparency));
+      }
     }
   }
 
