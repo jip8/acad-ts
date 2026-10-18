@@ -443,6 +443,10 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(71, dim.attachmentPoint, dimMap);
     this._writer.write(72, dim.lineSpacingStyle, dimMap);
     this._writer.write(41, dim.lineSpacingFactor, dimMap);
+    if (this.version >= ACadVersion.AC1021) {
+      this._writer.write(74, dim.flipArrow1, dimMap);
+      this._writer.write(75, dim.flipArrow2, dimMap);
+    }
     this._writer.write(42, dim.measurement, dimMap);
     this._writer.write(1, dim.text, dimMap);
     this._writer.write(53, dim.textRotation, dimMap);

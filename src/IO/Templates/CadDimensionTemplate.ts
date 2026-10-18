@@ -68,6 +68,8 @@ export class CadDimensionTemplate extends CadEntityTemplate {
 		dimension.text = source.text;
 		dimension.textRotation = source.textRotation;
 		dimension.horizontalDirection = source.horizontalDirection;
+		dimension.flipArrow1 = source.flipArrow1;
+		dimension.flipArrow2 = source.flipArrow2;
 
 		dimension.flags = source.flags;
 

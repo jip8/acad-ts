@@ -911,9 +911,13 @@ export abstract class DxfSectionReaderBase {
       }
       case 42:
         return true;
-      case 73:
       case 74:
+        (tmp.cadObject as Dimension).flipArrow1 = this._reader.valueAsBool;
+        return true;
       case 75:
+        (tmp.cadObject as Dimension).flipArrow2 = this._reader.valueAsBool;
+        return true;
+      case 73:
       case 90:
       case 361:
         return true;
