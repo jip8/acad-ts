@@ -118,6 +118,7 @@ export class DxfReader extends CadReaderBase<DxfReaderConfiguration> {
         case DxfFileToken.headerSection:
           this._document.header = this.readHeader();
           this._document.header.document = this._document;
+          if (this._document.header.handleSeed === 0) this._document.header.handleSeed = 1;
           this._builder.initialHandSeed = this._document.header.handleSeed;
           break;
         case DxfFileToken.classesSection:
