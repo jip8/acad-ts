@@ -2101,8 +2101,7 @@ export class DwgObjectReader extends DwgSectionIO {
     }
     if (this.r2004Plus) {
       mtext.backgroundFillFlags = this._objectReader.readBitLong() as BackgroundFillFlags;
-      if ((mtext.backgroundFillFlags & BackgroundFillFlags.UseBackgroundFillColor) !== 0
-        || (this._version > ACadVersion.AC1027 && (mtext.backgroundFillFlags & BackgroundFillFlags.TextFrame) > 0)) {
+      if ((mtext.backgroundFillFlags & BackgroundFillFlags.UseBackgroundFillColor) !== 0) {
         mtext.backgroundScale = this._objectReader.readBitDouble();
         mtext.backgroundColor = this._mergedReaders.readCmColor();
         mtext.backgroundTransparency = this._objectReader.readBitLong();
@@ -2313,12 +2312,18 @@ export class DwgObjectReader extends DwgSectionIO {
         }
         geometry.silhouettes.push(silhouette);
       }
-      if (!this._mergedReaders.readBit()) {
-        this._readModelerGeometryData(template);
-        return template;
+    }
+    if (!this._mergedReaders.readBit()) this._readModelerGeometryData(template);
+    if (this.r2007Plus && geometry.modelerFormatVersion > 1) {
+      const materials = this._mergedReaders.readBitLong();
+      for (let i = 0; i < materials; i++) {
+        geometry.materialMappings.push({
+          arrayIndex: this._mergedReaders.readBitLong(),
+          absoluteReference: this._mergedReaders.readBitLong(),
+          materialHandle: this._handleReference(),
+        });
       }
     }
-    if (this.r2007Plus) this._mergedReaders.readBitLong();
     return template;
   }
 
@@ -2663,13 +2668,7 @@ export class DwgObjectReader extends DwgSectionIO {
           xRecord.createEntry(code, this._objectReader.readRawULong());
           break;
         case GroupCodeValueType.Handle: {
-          const hex = this._objectReader.readTextUnicode();
-          const result = parseInt(hex, 16);
-          if (!isNaN(result)) {
-            template.addHandleReference(code, result);
-          } else {
-            this.notify(`Failed to parse ${hex} to handle`, NotificationType.Warning);
-          }
+          template.addHandleReference(code, this._objectReader.readRawULong());
           break;
         }
         case GroupCodeValueType.Bool:
@@ -3822,12 +3821,34 @@ export class DwgObjectReader extends DwgSectionIO {
     return template;
   }
 
-  private _readOsnapPointRef(): CadDimensionAssociationTemplate.OsnapPointRefTemplate {
+  private _readOsnapPointRef(depth: number = 0): CadDimensionAssociationTemplate.OsnapPointRefTemplate {
+    if (depth > 16) throw new Error('Excessive nested dimension point references.');
     const osnap = new OsnapPointRef();
     const template = new CadDimensionAssociationTemplate.OsnapPointRefTemplate(osnap);
     const className = this._mergedReaders.readVariableText();
     osnap.objectOsnapType = this._mergedReaders.readByte() as ObjectOsnapType;
-    template.objectHandle = this._handleReference();
+    const reader = this._mergedReaders;
+    const objects = reader.readBitLong();
+    for (let i = 0; i < objects; i++) template.objectHandles.push(this._handleReference());
+    template.objectHandle = template.objectHandles[0] ?? null;
+    if (osnap.objectOsnapType !== ObjectOsnapType.None) {
+      osnap.subentType = reader.readBitLong();
+      osnap.gsMarker = reader.readBitLong();
+      const paths = reader.readBitLong();
+      for (let i = 0; i < paths; i++) osnap.xrefPaths.push(reader.readVariableText());
+    }
+    osnap.geometryParameter = reader.readBitDouble();
+    osnap.osnapPoint = reader.read3BitDouble();
+    if (osnap.objectOsnapType === ObjectOsnapType.Intersection || osnap.objectOsnapType === ObjectOsnapType.ApparentIntersection) {
+      const intersections = reader.readBitLong();
+      for (let i = 0; i < intersections; i++) template.intersectionHandles.push(this._handleReference());
+      osnap.intersectionSubType = reader.readBitLong();
+      osnap.intersectionGsMarker = reader.readBitLong();
+      const paths = reader.readBitLong();
+      for (let i = 0; i < paths; i++) osnap.intersectionXrefPaths.push(reader.readVariableText());
+    }
+    osnap.hasLastPointRef = reader.readBit();
+    if (osnap.hasLastPointRef) template.lastPoint = this._readOsnapPointRef(depth + 1);
     return template;
   }
 
@@ -4282,7 +4303,33 @@ export class DwgObjectReader extends DwgSectionIO {
       } else {
         this._mergedReaders.readBit();
       }
-      this._readTableContent(table.content as unknown as TableContent, template as CadTableEntityTemplate);
+      this._readTableContent(table.content, template);
+      this._mergedReaders.readBitShort();
+      table.horizontalDirection = this._mergedReaders.read3BitDouble();
+      table.hasBreakData = this._mergedReaders.readBitLong() === 1;
+      if (table.hasBreakData) {
+        const data = table.tableBreakData;
+        data.flags = this._mergedReaders.readBitLong();
+        data.flowDirection = this._mergedReaders.readBitLong();
+        data.breakSpacing = this._mergedReaders.readBitDouble();
+        this._mergedReaders.readBitLong(); this._mergedReaders.readBitLong();
+        const heights = this._mergedReaders.readBitLong();
+        for (let i = 0; i < heights; i++) {
+          const height = new BreakHeight();
+          height.position = this._mergedReaders.read3BitDouble();
+          height.height = this._mergedReaders.readBitDouble();
+          this._mergedReaders.readBitLong();
+          data.heights.push(height);
+        }
+      }
+      const ranges = this._mergedReaders.readBitLong();
+      for (let i = 0; i < ranges; i++) {
+        const range = new BreakRowRange();
+        range.position = this._mergedReaders.read3BitDouble();
+        range.startRowIndex = this._mergedReaders.readBitLong();
+        range.endRowIndex = this._mergedReaders.readBitLong();
+        table.breakRowRanges.push(range);
+      }
       void longZero;
       return template;
     }
@@ -4872,12 +4919,133 @@ export class DwgObjectReader extends DwgSectionIO {
     format.textHeight = this._mergedReaders.readBitDouble();
   }
 
-  private _readTableContent(content: TableContent, template: CadTableEntityTemplate): void {
-    this._builder.notify(
-      `DWG R2010+ table content is not mapped yet for table ${template.cadObject.handle}; leaving table cells empty.`,
-      NotificationType.Warning,
-    );
-    void content;
+  private _readTableContent(content: TableEntity['content'], template: CadTableEntityTemplate): void {
+    const reader = this._mergedReaders;
+    const bind = (target: object, key: string, handle: number) => {
+      template.componentTemplates.push({ build: builder => { Reflect.set(target, key, builder.tryGetCadObject(handle)); } });
+    };
+    const customData = (entries: CustomDataEntry[]) => {
+      const count = reader.readBitLong();
+      for (let i = 0; i < count; i++) {
+        const entry = new CustomDataEntry();
+        entry.name = reader.readVariableText();
+        template.componentTemplates.push(this._readCadValue(entry.value));
+        entries.push(entry);
+      }
+    };
+    const cellStyle = (style: CellStyle) => {
+      const styleTemplate = new CadCellStyleTemplate(style);
+      this._readCellStyle(styleTemplate);
+      template.componentTemplates.push(styleTemplate);
+    };
+    content.name = reader.readVariableText();
+    content.description = reader.readVariableText();
+    const columns = reader.readBitLong();
+    for (let i = 0; i < columns; i++) {
+      const column = new TableEntityColumn();
+      column.name = reader.readVariableText();
+      column.customData = reader.readBitLong();
+      customData(column.customDataCollection);
+      cellStyle(column.cellStyleOverride);
+      column.styleId = reader.readBitLong();
+      column.width = reader.readBitDouble();
+      content.columns.push(column);
+    }
+    const rows = reader.readBitLong();
+    for (let i = 0; i < rows; i++) {
+      const row = new TableEntityRow();
+      const cells = reader.readBitLong();
+      for (let j = 0; j < cells; j++) {
+        const cell = new TableEntityCell();
+        cell.stateFlags = reader.readBitLong();
+        cell.toolTip = reader.readVariableText();
+        cell.customData = reader.readBitLong();
+        customData(cell.customDataCollection);
+        cell.hasLinkedData = reader.readBitLong() !== 0;
+        if (cell.hasLinkedData) {
+          bind(cell, 'dataLink', this._handleReference());
+          cell.linkedRowCount = reader.readBitLong();
+          cell.linkedColumnCount = reader.readBitLong();
+          cell.linkedDataFlags = reader.readBitLong();
+        }
+        const contents = reader.readBitLong();
+        for (let k = 0; k < contents; k++) {
+          const value = new CellContent();
+          value.contentType = reader.readBitLong();
+          if (value.contentType === TableCellContentType.Value) {
+            template.componentTemplates.push(this._readCadValue(value.cadValue));
+          } else if (value.contentType === TableCellContentType.Field) {
+            bind(value, 'field', this._handleReference());
+          } else if (value.contentType === TableCellContentType.Block) {
+            bind(value, 'blockRecord', this._handleReference());
+          }
+          const attributes = reader.readBitLong();
+          for (let n = 0; n < attributes; n++) {
+            const attribute = new TableAttribute();
+            bind(attribute, 'attributeDefinition', this._handleReference());
+            attribute.value = reader.readVariableText();
+            attribute.index = reader.readBitLong();
+            value.attributes.push(attribute);
+          }
+          value.format.hasData = reader.readBitShortAsBool();
+          if (value.format.hasData) {
+            const formatTemplate = new CadTableCellContentFormatTemplate(value.format);
+            this._readCellContentFormat(formatTemplate, value.format);
+            template.componentTemplates.push(formatTemplate);
+          }
+          cell.contents.push(value);
+        }
+        cellStyle(cell.styleOverride);
+        cell.styleId = reader.readBitLong();
+        const hasGeometry = reader.readBitLong();
+        if (hasGeometry !== 0) {
+          cell.geometryFlags = reader.readBitLong();
+          cell.geometryWidth = reader.readBitDouble();
+          cell.geometryHeight = reader.readBitDouble();
+          const geometryCount = reader.readBitLong();
+          bind(cell, 'geometryReference', this._handleReference());
+          for (let n = 0; n < geometryCount; n++) {
+            const geometry = new CellContentGeometry();
+            geometry.distanceTopLeft = reader.read3BitDouble();
+            geometry.distanceCenter = reader.read3BitDouble();
+            geometry.contentWidth = reader.readBitDouble();
+            geometry.contentHeight = reader.readBitDouble();
+            geometry.width = reader.readBitDouble();
+            geometry.height = reader.readBitDouble();
+            geometry.flags = reader.readBitLong();
+            cell.geometryCollection.push(geometry);
+          }
+          cell.geometry = cell.geometryCollection[0] ?? null;
+        }
+        row.cells.push(cell);
+      }
+      row.customData = reader.readBitLong();
+      customData(row.customDataCollection);
+      cellStyle(row.cellStyleOverride);
+      row.styleId = reader.readBitLong();
+      row.height = reader.readBitDouble();
+      content.rows.push(row);
+    }
+    const fieldCount = reader.readBitLong();
+    const fieldHandles: number[] = [];
+    for (let i = 0; i < fieldCount; i++) fieldHandles.push(this._handleReference());
+    template.componentTemplates.push({ build: builder => {
+      for (const handle of fieldHandles) {
+        const field = builder.tryGetCadObject(handle);
+        if (field) content.fieldReferences.push(field);
+      }
+    } });
+    cellStyle(content.cellStyleOverride);
+    const merged = reader.readBitLong();
+    for (let i = 0; i < merged; i++) {
+      const range = new CellRange();
+      range.topRowIndex = reader.readBitLong();
+      range.leftColumnIndex = reader.readBitLong();
+      range.bottomRowIndex = reader.readBitLong();
+      range.rightColumnIndex = reader.readBitLong();
+      content.mergedCellRanges.push(range);
+    }
+    template.styleHandle = this._handleReference();
   }
 
   private _readTableCellData(template: CadTableCellTemplate): void {
@@ -5042,30 +5210,39 @@ export class DwgObjectReader extends DwgSectionIO {
   }
 
   private _readStringCadValue(): string {
-    return this._mergedReaders.readVariableText();
+    const size = this._mergedReaders.readBitLong();
+    if (size <= 0) return '';
+    const bytes = this._mergedReaders.readBytes(size);
+    return decodeCadString(bytes, this.r2007Plus ? 'utf-16le' : this._mergedReaders.encoding).replace(/\0+$/, '');
   }
 
   private _readDateCadValue(): Date | null {
-    const julianDay = this._mergedReaders.readBitLong();
-    const msecs = this._mergedReaders.readBitLong();
-    // Julian day 2440588 = Jan 1, 1970
-    const unixDays = julianDay - 2440588;
-    return new Date(unixDays * 86400000 + msecs);
+    const size = this._mergedReaders.readBitLong();
+    if (size <= 0) return null;
+    const bytes = this._mergedReaders.readBytes(size);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (this.r2007Plus && (size === 14 || size === 16)) {
+      const dayOffset = size === 16 ? 6 : 4;
+      return new Date(view.getInt16(0, true), view.getInt16(2, true) - 1,
+        view.getInt16(dayOffset, true), view.getInt16(dayOffset + 2, true),
+        view.getInt16(dayOffset + 4, true), view.getInt16(dayOffset + 6, true),
+        view.getInt16(dayOffset + 8, true));
+    }
+    return size === 8 ? new Date(Number(view.getBigInt64(0, false)) * 1000) : null;
   }
 
   private _readValueXY(): XY {
-    return new XY(
-      this._mergedReaders.readBitDouble(),
-      this._mergedReaders.readBitDouble()
-    );
+    const size = this._mergedReaders.readBitLong();
+    if (size === 0) return new XY(0, 0);
+    if (size !== 16) throw new Error(`Invalid 2D CadValue size ${size}.`);
+    return this._mergedReaders.read2RawDouble();
   }
 
   private _readValueXYZ(): XYZ {
-    return new XYZ(
-      this._mergedReaders.readBitDouble(),
-      this._mergedReaders.readBitDouble(),
-      this._mergedReaders.readBitDouble()
-    );
+    const size = this._mergedReaders.readBitLong();
+    if (size === 0) return new XYZ(0, 0, 0);
+    if (size !== 24) throw new Error(`Invalid 3D CadValue size ${size}.`);
+    return new XYZ(this._mergedReaders.readDouble(), this._mergedReaders.readDouble(), this._mergedReaders.readDouble());
   }
 
   private _readState(): CadBlockVisibilityParameterTemplate.StateTemplate {

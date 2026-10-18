@@ -76,7 +76,7 @@ import { BlockRecord, BlockTypeFlags } from '../../../Tables/BlockRecord.js';
 import { UnknownEntity } from '../../../Entities/UnknownEntity.js';
 import { Wall } from '../../../Entities/AecEntities/Wall.js';
 import { ProxyEntity } from '../../../Entities/ProxyEntity.js';
-import { TableEntity, TableEntityCell, CellType, CellBorder, CellStyle, CellEdgeFlags, ContentFormat, MarginFlags } from '../../../Entities/TableEntity.js';
+import { TableEntity, TableEntityCell, CellType, CellBorder, CellStyle, CellEdgeFlags, ContentFormat, MarginFlags, TableCellContentType, CustomDataEntry } from '../../../Entities/TableEntity.js';
 import { CadBody } from '../../../Entities/CadBody.js';
 import { Region } from '../../../Entities/Region.js';
 import { IPolyline } from '../../../Entities/IPolyline.js';
@@ -1255,7 +1255,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 			this._writer.savePositonForSize();
 		}
 
-		this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, cadObject.owner.handle);
+		this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, cadObject.owner);
 		this._writeReactorsAndDictionaryHandle(cadObject);
 	}
 
@@ -2645,9 +2645,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _writeSolid3D(solid: Solid3D): void {
 		this._writeModelerGeometry(solid);
-		if (this.r2007Plus) {
-			this._writer.handleReference(0);
-		}
+		if (this.r2007Plus) this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, null);
 	}
 
 	private _writeTableEntity(table: TableEntity): void {
@@ -2655,12 +2653,35 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 		if (this.r2010Plus) {
 			this._writer.writeByte(table.version);
-			this._writer.handleReference(0);
+			this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, null);
 			this._writer.writeBitLong(0);
 			if (this.r2013Plus) {
 				this._writer.writeBitLong(0);
 			} else {
-				this._writer.writeBit(false);
+				this._writer.writeBit(true);
+			}
+			this._writeTableContent(table.content);
+			this._writer.writeBitShort(38);
+			this._writer.write3BitDouble(table.horizontalDirection);
+			this._writer.writeBitLong(table.hasBreakData ? 1 : 0);
+			if (table.hasBreakData) {
+				const data = table.tableBreakData;
+				this._writer.writeBitLong(data.flags);
+				this._writer.writeBitLong(data.flowDirection);
+				this._writer.writeBitDouble(data.breakSpacing);
+				this._writer.writeBitLong(0); this._writer.writeBitLong(0);
+				this._writer.writeBitLong(data.heights.length);
+				for (const height of data.heights) {
+					this._writer.write3BitDouble(height.position);
+					this._writer.writeBitDouble(height.height);
+					this._writer.writeBitLong(0);
+				}
+			}
+			this._writer.writeBitLong(table.breakRowRanges.length);
+			for (const range of table.breakRowRanges) {
+				this._writer.write3BitDouble(range.position);
+				this._writer.writeBitLong(range.startRowIndex);
+				this._writer.writeBitLong(range.endRowIndex);
 			}
 			return;
 		}
@@ -2676,7 +2697,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 			this._writer.writeBitDouble(row.height);
 		}
 
-		this._writer.handleReference(table.style);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, table.style);
 		for (const row of table.rows) {
 			for (const cell of row.cells) {
 				this._writeTableCell(cell);
@@ -2689,6 +2710,104 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeBit(false);
 	}
 
+	private _writeTableContent(content: TableEntity['content']): void {
+		const writer = this._writer;
+		const customData = (entries: CustomDataEntry[]) => {
+			writer.writeBitLong(entries.length);
+			for (const entry of entries) {
+				writer.writeVariableText(entry.name);
+				this._writeCadValue(entry.value);
+			}
+		};
+		writer.writeVariableText(content.name);
+		writer.writeVariableText(content.description);
+		writer.writeBitLong(content.columns.length);
+		for (const column of content.columns) {
+			writer.writeVariableText(column.name);
+			writer.writeBitLong(column.customData);
+			customData(column.customDataCollection);
+			this._writeCellStyle(column.cellStyleOverride);
+			writer.writeBitLong(column.styleId);
+			writer.writeBitDouble(column.width);
+		}
+		writer.writeBitLong(content.rows.length);
+		for (const row of content.rows) {
+			writer.writeBitLong(row.cells.length);
+			for (const cell of row.cells) {
+				writer.writeBitLong(cell.stateFlags);
+				writer.writeVariableText(cell.toolTip);
+				writer.writeBitLong(cell.customData);
+				customData(cell.customDataCollection);
+				writer.writeBitLong(cell.hasLinkedData ? 1 : 0);
+				if (cell.hasLinkedData) {
+					writer.handleReferenceTyped(DwgReferenceType.HardPointer, cell.dataLink);
+					writer.writeBitLong(cell.linkedRowCount);
+					writer.writeBitLong(cell.linkedColumnCount);
+					writer.writeBitLong(cell.linkedDataFlags);
+				}
+				writer.writeBitLong(cell.contents.length);
+				for (const value of cell.contents) {
+					writer.writeBitLong(value.contentType);
+					if (value.contentType === TableCellContentType.Value) {
+						this._writeCadValue(value.cadValue);
+					} else if (value.contentType === TableCellContentType.Field) {
+						writer.handleReferenceTyped(DwgReferenceType.HardPointer, value.field);
+						this._enqueueObject(value.field);
+					} else if (value.contentType === TableCellContentType.Block) {
+						writer.handleReferenceTyped(DwgReferenceType.HardPointer, value.blockRecord);
+					}
+					writer.writeBitLong(value.attributes.length);
+					for (const attribute of value.attributes) {
+						writer.handleReferenceTyped(DwgReferenceType.SoftPointer, attribute.attributeDefinition);
+						writer.writeVariableText(attribute.value);
+						writer.writeBitLong(attribute.index);
+					}
+					writer.writeBitShort(value.format.hasData ? 1 : 0);
+					if (value.format.hasData) this._writeCellContentFormat(value.format);
+				}
+				this._writeCellStyle(cell.styleOverride);
+				writer.writeBitLong(cell.styleId);
+				const geometry = cell.geometryCollection.length > 0 ? cell.geometryCollection : cell.geometry ? [cell.geometry] : [];
+				writer.writeBitLong(geometry.length > 0 ? 1 : 0);
+				if (geometry.length > 0) {
+					writer.writeBitLong(cell.geometryFlags);
+					writer.writeBitDouble(cell.geometryWidth);
+					writer.writeBitDouble(cell.geometryHeight);
+					writer.writeBitLong(geometry.length);
+					writer.handleReferenceTyped(DwgReferenceType.SoftPointer, cell.geometryReference);
+					for (const item of geometry) {
+						writer.write3BitDouble(item.distanceTopLeft);
+						writer.write3BitDouble(item.distanceCenter);
+						writer.writeBitDouble(item.contentWidth);
+						writer.writeBitDouble(item.contentHeight);
+						writer.writeBitDouble(item.width);
+						writer.writeBitDouble(item.height);
+						writer.writeBitLong(item.flags);
+					}
+				}
+			}
+			writer.writeBitLong(row.customData);
+			customData(row.customDataCollection);
+			this._writeCellStyle(row.cellStyleOverride);
+			writer.writeBitLong(row.styleId);
+			writer.writeBitDouble(row.height);
+		}
+		writer.writeBitLong(content.fieldReferences.length);
+		for (const field of content.fieldReferences) {
+			writer.handleReferenceTyped(DwgReferenceType.HardOwnership, field);
+			this._enqueueObject(field);
+		}
+		this._writeCellStyle(content.cellStyleOverride);
+		writer.writeBitLong(content.mergedCellRanges.length);
+		for (const range of content.mergedCellRanges) {
+			writer.writeBitLong(range.topRowIndex);
+			writer.writeBitLong(range.leftColumnIndex);
+			writer.writeBitLong(range.bottomRowIndex);
+			writer.writeBitLong(range.rightColumnIndex);
+		}
+		writer.handleReferenceTyped(DwgReferenceType.HardPointer, content.style);
+	}
+
 	private _writeCadBody(body: CadBody): void {
 		this._writeModelerGeometry(body);
 	}
@@ -2698,48 +2817,71 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _writeModelerGeometry(geometry: ModelerGeometry): void {
-		if (!this.r2013Plus) {
-			this._writer.writeBit(true);
-		}
-
-		this._writer.writeBit(true);
-
-		const hasPoint = geometry.point.x !== 0 || geometry.point.y !== 0 || geometry.point.z !== 0;
-		this._writer.writeBit(hasPoint);
-		if (hasPoint) {
-			this._writer.write3BitDouble(geometry.point);
-		}
-
-		this._writer.writeBitLong(0);
-		this._writer.writeBit(geometry.wires.length > 0);
-		if (geometry.wires.length > 0) {
-			this._writer.writeBitLong(geometry.wires.length);
-			for (const wire of geometry.wires) {
-				this._writeModelerGeometryWire(wire);
+		const data = geometry.binaryData;
+		const version = geometry.isBinaryAcisData ? 2 : 1;
+		this._writer.writeBit(data.length === 0);
+		if (data.length > 0) {
+			this._writer.writeBit(false);
+			this._writer.writeBitShort(version);
+			if (version === 2) {
+				this._writer.writeBytes(data);
+			} else {
+				for (let offset = 0; offset < data.length; offset += 4096) {
+					const block = data.slice(offset, offset + 4096);
+					for (let i = 0; i < block.length; i++) {
+						if (block[i] >= 0x20 && block[i] <= 0x7e) block[i] = 0x9f - block[i];
+					}
+					this._writer.writeBitLong(block.length);
+					this._writer.writeBytes(block);
+				}
+				this._writer.writeBitLong(0);
 			}
 		}
 
-		this._writer.writeBitLong(geometry.silhouettes.length);
-		for (const silhouette of geometry.silhouettes) {
-			this._writer.writeBitLongLong(silhouette.viewportId);
-			this._writer.write3BitDouble(silhouette.viewportTarget);
-			this._writer.write3BitDouble(silhouette.viewportDirectionFromTarget);
-			this._writer.write3BitDouble(silhouette.viewportUpDirection);
-			this._writer.writeBit(silhouette.viewportPerspective);
-
-			this._writer.writeBit(silhouette.wires.length > 0);
-			if (silhouette.wires.length > 0) {
-				this._writer.writeBitLong(silhouette.wires.length);
-				for (const wire of silhouette.wires) {
-					this._writeModelerGeometryWire(wire);
+		const hasPoint = geometry.point.x !== 0 || geometry.point.y !== 0 || geometry.point.z !== 0;
+		const hasWireframe = hasPoint || geometry.wires.length > 0 || geometry.silhouettes.length > 0;
+		this._writer.writeBit(hasWireframe);
+		if (hasWireframe) {
+			this._writer.writeBit(hasPoint);
+			if (hasPoint) this._writer.write3BitDouble(geometry.point);
+			this._writer.writeBitLong(0);
+			this._writer.writeBit(geometry.wires.length > 0);
+			if (geometry.wires.length > 0) {
+				this._writer.writeBitLong(geometry.wires.length);
+				for (const wire of geometry.wires) this._writeModelerGeometryWire(wire);
+			}
+			this._writer.writeBitLong(geometry.silhouettes.length);
+			for (const silhouette of geometry.silhouettes) {
+				this._writer.writeBitLongLong(silhouette.viewportId);
+				this._writer.write3BitDouble(silhouette.viewportTarget);
+				this._writer.write3BitDouble(silhouette.viewportDirectionFromTarget);
+				this._writer.write3BitDouble(silhouette.viewportUpDirection);
+				this._writer.writeBit(silhouette.viewportPerspective);
+				this._writer.writeBit(silhouette.wires.length > 0);
+				if (silhouette.wires.length > 0) {
+					this._writer.writeBitLong(silhouette.wires.length);
+					for (const wire of silhouette.wires) this._writeModelerGeometryWire(wire);
 				}
 			}
 		}
 
 		this._writer.writeBit(true);
 
-		if (this.r2007Plus) {
-			this._writer.writeBitLong(0);
+		if (this.r2007Plus && version > 1) {
+			this._writer.writeBitLong(geometry.materialMappings.length);
+			for (const material of geometry.materialMappings) {
+				this._writer.writeBitLong(material.arrayIndex);
+				this._writer.writeBitLong(material.absoluteReference);
+				this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, material.materialHandle);
+			}
+		}
+		if (this.r2013Plus) {
+			this._writer.writeBit(geometry.revisionGuidPresent);
+			this._writer.writeBitLong(geometry.revisionMajor);
+			this._writer.writeBitShort(geometry.revisionMinor1);
+			this._writer.writeBitShort(geometry.revisionMinor2);
+			this._writer.writeBytes(geometry.revisionBytes);
+			this._writer.writeBitLong(geometry.revisionEndMarker);
 		}
 	}
 
@@ -2777,8 +2919,8 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeBitLong(cell.borderHeight);
 		this._writer.writeBitDouble(cell.rotation);
 
-		this._writer.handleReference(0);
-		if (cell.type === CellType.Text) {
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, cell.type === CellType.Block ? cell.content?.blockRecord : cell.value);
+		if (cell.type === CellType.Text && cell.value == null && !this.r2007Plus) {
 			const value = cell.content?.cadValue.value;
 			this._writer.writeVariableText(typeof value === 'string' ? value : value == null ? '' : String(value));
 		} else if (cell.type === CellType.Block) {
@@ -2979,8 +3121,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 		if (this.r2004Plus) {
 			this._writer.writeBitLong(mtext.backgroundFillFlags);
 
-			if ((mtext.backgroundFillFlags & BackgroundFillFlags.UseBackgroundFillColor) !== BackgroundFillFlags.None
-				|| (this._version > ACadVersion.AC1027 && (mtext.backgroundFillFlags & BackgroundFillFlags.TextFrame) > 0)) {
+			if ((mtext.backgroundFillFlags & BackgroundFillFlags.UseBackgroundFillColor) !== BackgroundFillFlags.None) {
 				this._writer.writeBitDouble(mtext.backgroundScale);
 				this._writer.writeCmColor(mtext.backgroundColor);
 				this._writer.writeBitLong(mtext.backgroundTransparency);
@@ -3121,7 +3262,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 			this._writer.writeByte(viewport.defaultLightingType);
 			this._writer.writeBitDouble(viewport.brightness);
 			this._writer.writeBitDouble(viewport.contrast);
-			this._writer.writeCmColor(viewport.ambientLightColor);
+			this._writer.writeCmColor(viewport.ambientLightColor ?? Color.byLayer);
 		}
 
 		if (this.r13_14Only) {
@@ -3198,6 +3339,12 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _skipEntry(entry: CadObject): { skip: boolean; notify: boolean } {
 		if (entry instanceof XRecord && !this.writeXRecords) return { skip: true, notify: false };
+		if (this.r2007Plus && entry instanceof XRecord
+			&& entry.entries.filter(item => item.code === 102).length === 1
+			&& entry.entries.some(item => item.code === 102 && item.value === 'ACAD_ROUNDTRIP_PRE2007_TABLESTYLE')) {
+			// These values are migrated into TABLESTYLE's native format below.
+			return { skip: true, notify: false };
+		}
 		if (!this.writeDynamicBlockData && (
 			entry instanceof EvaluationGraph ||
 			entry instanceof BlockRepresentationData ||
@@ -3219,13 +3366,16 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _writeObjects(): void {
-		while (this._objects.length > 0) {
-			const obj = this._objects.shift()!;
-			this._writeObject(obj);
+		// References append work while objects are written. Avoid moving the
+		// entire pending array for every object in a large drawing.
+		for (let index = 0; index < this._objects.length; index++) {
+			this._writeObject(this._objects[index]);
 		}
+		this._objects.length = 0;
 	}
 
 	private _writeObject(obj: CadObject): void {
+		if (this.map.has(obj.handle)) return;
 		const validationErrors = obj.validate(CadFileFormat.DWG, this._version);
 		if (validationErrors.length > 0) {
 			this.notify(`Invalid object ${obj.constructor.name}: ${validationErrors.join(' ')}`, NotificationType.Warning);
@@ -3456,10 +3606,32 @@ export class DwgObjectWriter extends DwgSectionIO {
 		}
 	}
 
-	private _writeOsnapPointRef(osnap: OsnapPointRef): void {
+	private _writeOsnapPointRef(osnap: OsnapPointRef | null, depth: number = 0): void {
+		if (depth > 16) throw new Error('Excessive nested dimension point references.');
+		osnap ??= new OsnapPointRef();
 		this._writer.writeVariableText(DimensionAssociation.osnapPointRefClassName);
 		this._writer.writeByte(osnap.objectOsnapType);
-		this._writer.handleReferenceTyped(DwgReferenceType.Undefined, osnap.geometry);
+		const geometry = osnap.geometryPath.length > 0 ? osnap.geometryPath : osnap.geometry ? [osnap.geometry] : [];
+		this._writer.writeBitLong(geometry.length);
+		for (const object of geometry) this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, object);
+		if (osnap.objectOsnapType !== 0) {
+			this._writer.writeBitLong(osnap.subentType);
+			this._writer.writeBitLong(osnap.gsMarker);
+			this._writer.writeBitLong(osnap.xrefPaths.length);
+			for (const path of osnap.xrefPaths) this._writer.writeVariableText(path);
+		}
+		this._writer.writeBitDouble(osnap.geometryParameter);
+		this._writer.write3BitDouble(osnap.osnapPoint);
+		if (osnap.objectOsnapType === 6 || osnap.objectOsnapType === 11) {
+			this._writer.writeBitLong(osnap.intersectionGeometry.length);
+			for (const object of osnap.intersectionGeometry) this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, object);
+			this._writer.writeBitLong(osnap.intersectionSubType);
+			this._writer.writeBitLong(osnap.intersectionGsMarker);
+			this._writer.writeBitLong(osnap.intersectionXrefPaths.length);
+			for (const path of osnap.intersectionXrefPaths) this._writer.writeVariableText(path);
+		}
+		this._writer.writeBit(osnap.hasLastPointRef);
+		if (osnap.hasLastPointRef) this._writeOsnapPointRef(osnap.lastPointRef, depth + 1);
 	}
 
 	private _writeProxyObject(proxy: ProxyObject): void {
@@ -3468,7 +3640,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _writeBlockRepresentationData(representation: BlockRepresentationData): void {
 		this._writer.writeBitShort(representation.value70);
-		this._writer.handleReference(representation.block);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardOwnership, representation.block);
 	}
 
 	private _writeBlockReferenceObjectContextData(contextData: BlockReferenceObjectContextData): void {
@@ -3523,6 +3695,19 @@ export class DwgObjectWriter extends DwgSectionIO {
 	}
 
 	private _writeTableStyle(tableStyle: TableStyle): void {
+		if (this.r2007Plus) {
+			const legacy = tableStyle.xDictionary?.getEntry<XRecord>('ACAD_XREC_ROUNDTRIP');
+			if (legacy instanceof XRecord && legacy.entries.some(entry => entry.code === 102 && entry.value === 'ACAD_ROUNDTRIP_PRE2007_TABLESTYLE')) {
+				for (const [index, style] of [tableStyle.dataCellStyle, tableStyle.titleCellStyle, tableStyle.headerCellStyle].entries()) {
+					const type = legacy.entries.find(entry => entry.code === 90 + index * 2)?.value;
+					const unit = legacy.entries.find(entry => entry.code === 91 + index * 2)?.value;
+					const format = legacy.entries.find(entry => entry.code === 1 + index)?.value;
+					if (typeof type === 'number') style.valueDataType = type;
+					if (typeof unit === 'number') style.valueUnitType = unit;
+					if (typeof format === 'string') style.valueFormatString = format;
+				}
+			}
+		}
 		// R2007 still uses row styles; the cell-style layout starts in R2010.
 		if (this.r2010Plus) {
 			const cellStyles = [...new Set([
@@ -4227,12 +4412,9 @@ export class DwgObjectWriter extends DwgSectionIO {
 				dv.setInt16(14, date.getMilliseconds(), true);
 			} else {
 				const seconds = Math.floor((date.getTime() - new Date(1970, 0, 1).getTime()) / 1000);
-				const high = (seconds >>> 32) | 0;
-				const low = seconds | 0;
 				array = new Uint8Array(8);
 				const dv = new DataView(array.buffer);
-				dv.setInt32(0, high, false);
-				dv.setInt32(4, low, false);
+				dv.setBigInt64(0, BigInt(seconds), false);
 			}
 
 			this._writer.writeBitLong(array.length);
@@ -4245,6 +4427,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 	private _writeStringCadValue(value: string): void {
 		if (!value) {
 			this._writer.writeBitLong(0);
+			return;
 		}
 
 		let bytes: Uint8Array;
@@ -4662,8 +4845,8 @@ export class DwgObjectWriter extends DwgSectionIO {
 				}
 				case GroupCodeValueType.Handle: {
 					const handle = getHandleValue(entry.value);
-					const text = handle === 0 ? '' : handle.toString(16).toUpperCase();
-					this._writeStringInChunks(chunks, text);
+					// ResBuf handles are fixed-width values, not hexadecimal strings.
+					pushInt64LE(handle);
 					break;
 				}
 				case GroupCodeValueType.String:

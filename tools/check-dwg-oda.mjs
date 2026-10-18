@@ -7,8 +7,9 @@ import { ACadVersion, DwgReader, DwgReaderConfiguration, DwgWriter, DwgWriterCon
 // Run after npm run build. Each run uses fresh directories to avoid stale DXFs
 // giving false positives. ODA can return success even when a drawing fails.
 const converter = process.argv[2];
+const matrix = process.argv.includes('--matrix');
 if (!converter) {
-  console.error('Usage: node tools/check-dwg-oda.mjs <ODAFileConverter executable | --generate-only>');
+  console.error('Usage: node tools/check-dwg-oda.mjs <ODAFileConverter executable | --generate-only> [--matrix]');
   process.exit(2);
 }
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -21,19 +22,32 @@ const results = [];
 for (const file of readdirSync(path.join(root, 'samples')).filter(name => /^sample_AC\d+\.dwg$/i.test(name))) {
   const source = path.join(root, 'samples', file);
   const bytes = readFileSync(source);
-  for (const dynamic of [false, true]) {
-    const configuration = new DwgReaderConfiguration();
-    configuration.keepUnknownEntities = true;
-    configuration.keepUnknownNonGraphicalObjects = true;
-    const document = DwgReader.readFromStreamWithConfig(
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), configuration, () => {},
-    );
-    if (document.header.version < ACadVersion.AC1014 || document.header.version === ACadVersion.AC1021) continue;
-    const outputName = file.replace(/\.dwg$/i, dynamic ? '-dynamic.dwg' : '-default.dwg');
-    const writerConfiguration = new DwgWriterConfiguration();
-    writerConfiguration.writeDynamicBlockData = dynamic;
-    writeFileSync(path.join(rewrittenInput, outputName), DwgWriter.writeToBuffer(document, writerConfiguration, () => {}));
-    results.push({ file: outputName, kind: 'rewritten' });
+  const sourceVersion = new TextDecoder().decode(bytes.subarray(0, 6));
+  const targets = matrix
+    ? [...new Set([sourceVersion, 'AC1018', 'AC1024', 'AC1027', 'AC1032'])]
+    : [sourceVersion];
+  for (const target of targets) {
+    const targetVersion = ACadVersion[target];
+    if (targetVersion < ACadVersion.AC1014 || targetVersion === ACadVersion.AC1021) continue;
+    for (const dynamic of [false, true]) {
+      const configuration = new DwgReaderConfiguration();
+      configuration.keepUnknownEntities = true;
+      configuration.keepUnknownNonGraphicalObjects = true;
+      const document = DwgReader.readFromStreamWithConfig(
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), configuration, () => {},
+      );
+      document.header.version = targetVersion;
+      const suffix = (target === sourceVersion ? '' : `-${target}`) + (dynamic ? '-dynamic.dwg' : '-default.dwg');
+      const outputName = file.replace(/\.dwg$/i, suffix);
+      const writerConfiguration = new DwgWriterConfiguration();
+      writerConfiguration.writeDynamicBlockData = dynamic;
+      try {
+        writeFileSync(path.join(rewrittenInput, outputName), DwgWriter.writeToBuffer(document, writerConfiguration, () => {}));
+        results.push({ file: outputName, kind: 'rewritten' });
+      } catch (error) {
+        results.push({ file: outputName, kind: 'rewritten', writeError: error.message });
+      }
+    }
   }
   copyFileSync(source, path.join(originalInput, file));
   results.push({ file, kind: 'originals' });

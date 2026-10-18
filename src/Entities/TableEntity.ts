@@ -230,6 +230,7 @@ export enum CellOverrideFlags {
 export class TableAttribute {
 	attributeDefinition: AttributeDefinition | null = null;
 	value: string = '';
+	index: number = 1;
 }
 
 export class CustomDataEntry {
@@ -285,6 +286,7 @@ export class CellBorder {
 }
 
 export class CellContent {
+	attributes: TableAttribute[] = [];
 	blockRecord: BlockRecord | null = null;
 	contentType: TableCellContentType = TableCellContentType.Unknown;
 	format: ContentFormat = new ContentFormat();
@@ -320,6 +322,16 @@ export class CellStyle extends ContentFormat {
 }
 
 export class TableEntityCell {
+	styleId: number = 0;
+	dataLink: CadObject | null = null;
+	linkedRowCount: number = 0;
+	linkedColumnCount: number = 0;
+	linkedDataFlags: number = 0;
+	geometryFlags: number = 0;
+	geometryWidth: number = 0;
+	geometryHeight: number = 0;
+	geometryReference: CadObject | null = null;
+	geometryCollection: CellContentGeometry[] = [];
 	attributes: TableAttribute[] = [];
 	autoFit: boolean = false;
 	blockScale: number = 0;
@@ -355,6 +367,7 @@ export class TableEntityCell {
 }
 
 export class TableEntityColumn {
+	styleId: number = 0;
 	name: string = '';
 	width: number = 0;
 	customData: number = 0;
@@ -363,6 +376,7 @@ export class TableEntityColumn {
 }
 
 export class TableEntityRow {
+	styleId: number = 0;
 	height: number = 0;
 	customData: number = 0;
 	cellStyleOverride: CellStyle = new CellStyle();
@@ -431,6 +445,7 @@ export class TableEntity extends Insert {
 	valueFlag: number = 0;
 
 	version: number = 0;
+	hasBreakData: boolean = false;
 
 	breakRowRanges: BreakRowRange[] = [];
 
@@ -458,6 +473,9 @@ export class TableEntity extends Insert {
 }
 
 export class TableContent {
+	name: string = '';
+	description: string = '';
+	fieldReferences: CadObject[] = [];
 	columns: TableEntityColumn[] = [];
 	rows: TableEntityRow[] = [];
 	style: TableStyle | null = null;

@@ -53,6 +53,9 @@ export class CadDimensionAssociationTemplate extends CadTemplateT<DimensionAssoc
 export namespace CadDimensionAssociationTemplate {
 	export class OsnapPointRefTemplate implements ICadTemplate {
 		objectHandle: number | null = null;
+		objectHandles: number[] = [];
+		intersectionHandles: number[] = [];
+		lastPoint: OsnapPointRefTemplate | null = null;
 
 		osnapPointRef: OsnapPointRef;
 
@@ -61,6 +64,10 @@ export namespace CadDimensionAssociationTemplate {
 		}
 
 		build(builder: CadDocumentBuilder): void {
+			this.osnapPointRef.geometryPath = this.objectHandles.map(handle => builder.tryGetCadObject<CadObject>(handle)).filter(object => object != null);
+			this.osnapPointRef.intersectionGeometry = this.intersectionHandles.map(handle => builder.tryGetCadObject<CadObject>(handle)).filter(object => object != null);
+			this.lastPoint?.build(builder);
+			this.osnapPointRef.lastPointRef = this.lastPoint?.osnapPointRef ?? null;
 			const obj = builder.tryGetCadObject<CadObject>(this.objectHandle);
 			if (obj) {
 				this.osnapPointRef.geometry = obj;

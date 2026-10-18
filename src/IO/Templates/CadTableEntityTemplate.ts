@@ -16,6 +16,7 @@ export class CadTableEntityTemplate extends CadInsertTemplate {
 	blockOwnerHandle: number | null = null;
 
 	cadTableCellTemplates: CadTableCellTemplate[] = [];
+	componentTemplates: ICadTemplate[] = [];
 
 	get currentCell(): TableEntityCell { return this.currentCellTemplate.cell; }
 
@@ -63,6 +64,7 @@ export class CadTableEntityTemplate extends CadInsertTemplate {
 		for (const cellTemplate of this.cadTableCellTemplates) {
 			cellTemplate.build(builder);
 		}
+		for (const component of this.componentTemplates) component.build(builder);
 	}
 }
 

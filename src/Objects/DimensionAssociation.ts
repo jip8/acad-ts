@@ -20,6 +20,11 @@ export class OsnapPointRef {
 	intersectionGsMarker: number = 0;
 	hasLastPointRef: boolean = false;
 	geometry: CadObject | null = null;
+	geometryPath: CadObject[] = [];
+	xrefPaths: string[] = [];
+	intersectionGeometry: CadObject[] = [];
+	intersectionXrefPaths: string[] = [];
+	lastPointRef: OsnapPointRef | null = null;
 }
 
 export class DimensionAssociation extends NonGraphicalObject {

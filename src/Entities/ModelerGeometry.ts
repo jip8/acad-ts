@@ -47,6 +47,13 @@ export abstract class ModelerGeometry extends Entity {
 	/** @internal */ acisTextEncoded: boolean | null = null;
 
 	modelerFormatVersion: number = 0;
+	materialMappings: { arrayIndex: number; absoluteReference: number; materialHandle: number }[] = [];
+	revisionGuidPresent: boolean = false;
+	revisionMajor: number = 0;
+	revisionMinor1: number = 0;
+	revisionMinor2: number = 0;
+	revisionBytes: Uint8Array = new Uint8Array(8);
+	revisionEndMarker: number = 0;
 
 	/** Raw SAT/SAB modeler payload when it is stored inline in the entity. */
 	binaryData: Uint8Array = new Uint8Array(0);
