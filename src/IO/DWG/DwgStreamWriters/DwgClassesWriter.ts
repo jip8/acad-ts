@@ -43,7 +43,9 @@ export class DwgClassesWriter extends DwgSectionIO {
 			this._writer.savePositonForSize();
 		}
 
-		let maxClassNumber = 0;
+		// R2004 infers the class count from this value (class numbers start at
+		// 500). Zero underflows the count when a new document has no classes.
+		let maxClassNumber = this._version === ACadVersion.AC1018 ? 499 : 0;
 		const classesArr = [...this._document.classes];
 		if (classesArr.length > 0) {
 			maxClassNumber = Math.max(...classesArr.map(c => c.classNumber));

@@ -2,32 +2,62 @@ import { ModelerGeometry } from '../../../Entities/ModelerGeometry.js';
 
 /** Byte-oriented AcDs storage (ODA specification, chapter 24). */
 class StorageBytes {
-	readonly bytes: number[] = [];
-	uint16(value: number): void { this.bytes.push(value & 255, (value >>> 8) & 255); }
+	private _bytes = new Uint8Array(128);
+	private _length = 0;
+	get bytes(): Uint8Array { return this._bytes.subarray(0, this._length); }
+	private _reserve(count: number): void {
+		if (this._length + count <= this._bytes.length) return;
+		const bytes = new Uint8Array(Math.max(this._length + count, this._bytes.length * 2));
+		bytes.set(this.bytes);
+		this._bytes = bytes;
+	}
+	uint16(value: number): void {
+		this._reserve(2);
+		this._bytes[this._length++] = value;
+		this._bytes[this._length++] = value >>> 8;
+	}
 	uint32(value: number): void {
-		for (let i = 0; i < 4; i++) this.bytes.push((value >>> (8 * i)) & 255);
+		this._reserve(4);
+		for (let i = 0; i < 4; i++) this._bytes[this._length++] = value >>> (8 * i);
 	}
 	uint64(value: number): void { this.uint32(value); this.uint32(Math.floor(value / 0x100000000)); }
-	append(value: Iterable<number>): void { for (const byte of value) this.bytes.push(byte); }
-	text(value: string): void { this.append(new TextEncoder().encode(value)); this.bytes.push(0); }
-	align(size: number, fill: number = 0x55): void { while (this.bytes.length % size) this.bytes.push(fill); }
+	append(value: ArrayLike<number>): void {
+		this._reserve(value.length);
+		this._bytes.set(value, this._length);
+		this._length += value.length;
+	}
+	text(value: string): void { this.append(new TextEncoder().encode(value)); this.append([0]); }
+	align(size: number, fill: number = 0x55): void {
+		const padding = (size - this._length % size) % size;
+		this._reserve(padding);
+		this._bytes.fill(fill, this._length, this._length + padding);
+		this._length += padding;
+	}
 }
 
 /** Stores modeler payloads by entity handle, including the search index ODA needs. */
 export class DwgPrototype1bWriter {
 	static write(geometry: readonly ModelerGeometry[]): Uint8Array {
 		geometry = [...geometry].sort((a, b) => a.handle - b.handle);
-		if (geometry.some(entity => entity.binaryData.length > 0x40000)) {
-			throw new Error('AcDs modeler payloads larger than 256 KiB require blob-page storage, which is not supported yet.');
-		}
+		// A blob page plus its 48-byte segment and 32-byte page headers fits 1 MiB.
+		const pageSize = 0xfffb0;
+		let segmentCount = 6;
+		const records = geometry.map(entity => {
+			const count = entity.binaryData.length > 0x40000 ? Math.ceil(entity.binaryData.length / pageSize) : 0;
+			const pages = Array.from({ length: count }, (_, index) => ({
+				segmentIndex: segmentCount++, offset: index * pageSize,
+				size: Math.min(pageSize, entity.binaryData.length - index * pageSize),
+			}));
+			return { entity, pages, size: count ? 36 + count * 8 : 4 + entity.binaryData.length };
+		});
 		const segments: Uint8Array[] = [];
-		const segment = (name: string, body: StorageBytes, systemOffset = 0, objectOffset = 0) => {
+		const segment = (name: string, body: StorageBytes, systemOffset = 0, objectOffset = 0, blob = false) => {
 			const size = Math.ceil((48 + body.bytes.length) / 64) * 64;
 			const header = new StorageBytes();
 			header.uint16(0xd5ac);
 			header.append(new TextEncoder().encode(name));
 			header.uint32(segments.length);
-			header.uint32(0);
+			header.uint32(blob ? 1 : 0);
 			header.uint32(size);
 			header.uint32(0);
 			header.uint32(1); // Storage revision.
@@ -37,10 +67,10 @@ export class DwgPrototype1bWriter {
 			header.append(new Uint8Array(8).fill(0x55));
 			header.append(body.bytes);
 			header.align(64, 0x70);
-			segments.push(new Uint8Array(header.bytes));
+			segments.push(header.bytes);
 		};
 		const index = new StorageBytes();
-		for (let i = 0; i < 6; i++) { index.uint64(0); index.uint32(0); }
+		for (let i = 0; i < segmentCount; i++) { index.uint64(0); index.uint32(0); }
 		segment('segidx', index); // Filled after all segment sizes are known.
 
 		const schemas = new StorageBytes();
@@ -74,13 +104,23 @@ export class DwgPrototype1bWriter {
 
 		const data = new StorageBytes();
 		let localOffset = 0;
-		for (const entity of geometry) {
+		for (const { entity, size } of records) {
 			data.uint32(20); data.uint32(1); data.uint64(entity.handle); data.uint32(localOffset);
-			localOffset += 4 + entity.binaryData.length;
+			localOffset += size;
 		}
 		data.align(16);
 		const objectOffset = (48 + data.bytes.length) / 16;
-		for (const entity of geometry) { data.uint32(entity.binaryData.length); data.append(entity.binaryData); }
+		for (const { entity, pages, size } of records) {
+			if (pages.length === 0) {
+				data.uint32(entity.binaryData.length); data.append(entity.binaryData);
+			} else {
+				data.uint32(0xbb106bb1);
+				data.uint64(entity.binaryData.length); data.uint32(pages.length);
+				data.uint32(size); data.uint32(pageSize); data.uint32(pages[pages.length - 1].size);
+				data.uint32(0); data.uint32(0);
+				for (const page of pages) { data.uint32(page.segmentIndex); data.uint32(page.size); }
+			}
+		}
 		segment('_data_', data, 0, objectOffset);
 
 		const search = new StorageBytes();
@@ -91,6 +131,16 @@ export class DwgPrototype1bWriter {
 			search.uint64(entity.handle); search.uint64(1); search.uint64(i);
 		}
 		segment('search', search);
+
+		for (const { entity, pages } of records) {
+			for (const [index, page] of pages.entries()) {
+				const body = new StorageBytes();
+				body.uint64(entity.binaryData.length); body.uint64(page.offset);
+				body.uint32(index); body.uint32(pages.length); body.uint64(page.size);
+				body.append(entity.binaryData.subarray(page.offset, page.offset + page.size));
+				segment('blob01', body, 0, 0, true);
+			}
+		}
 
 		let size = 128;
 		const offsets = segments.map(bytes => { const offset = size; size += bytes.length; return offset; });

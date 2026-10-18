@@ -189,6 +189,11 @@ describe('DWG interoperability follow-up to #11', () => {
 });
 
 describe.skipIf(!process.env.ODA_FILE_CONVERTER)('ODA interoperability', () => {
+  it('audits solid, region and body payloads through multiple blob pages', () => {
+    execFileSync(process.execPath, ['tools/check-dwg-oda-blobs.mjs', process.env.ODA_FILE_CONVERTER!], {
+      cwd: process.cwd(), stdio: 'pipe', timeout: 300000, windowsHide: true,
+    });
+  }, 300000);
   it('audits originals and the public sample version matrix', () => {
     // Requires npm run build and an explicitly configured local converter.
     execFileSync(process.execPath, ['tools/check-dwg-oda.mjs', process.env.ODA_FILE_CONVERTER!, '--matrix'], {

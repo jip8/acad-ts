@@ -39,6 +39,20 @@ node tools/check-dwg-oda.mjs "/path/to/ODAFileConverter" --matrix
 
 The eight formerly failing AC1014/AC1015 upgrades to AC1027/AC1032 now store their modeler payloads in AcDs, with entity flags and a handle search index. Inline legacy ACIS flags are retained, and SAT whitespace is decoded correctly. Native R2013/R2018 AcDs records are read in payload-offset order, and the entity reader skips the absent inline prefix. ASM binary signatures and end markers are recognized when downgrading R2018 geometry. AC1021 output is excluded as described above.
 
-ODA acceptance is not proof of complete content preservation. Regression tests compare modeler payload hashes for all six writable sample versions, legacy upgrades and R2018 downgrades, alongside original modern table content. The native check verifies all three baseline modeler handles in every rewritten drawing. AcDs writing currently supports individual payloads up to 256 KiB; larger payloads throw an explicit error because blob-page writing is not implemented. Objects rejected by the reader or skipped by the writer can still be missing. The reporter's broader drawing collection, AEC/private objects, large-file performance and DXF entity omissions have not been validated here.
+ODA acceptance is not proof of complete content preservation. Regression tests compare modeler payload hashes for all six writable sample versions, legacy upgrades and R2018 downgrades, alongside original modern table content. The native check verifies all three baseline modeler handles in every rewritten drawing. Objects rejected by the reader or skipped by the writer can still be missing. The reporter's broader drawing collection, AEC/private objects, large-file performance and DXF entity omissions have not been validated here.
 
-Set `ODA_FILE_CONVERTER` to the executable path when running tests to enable the optional full-matrix ODA regression check (build first).
+### Large modeler payloads
+
+DWG writing supports 3DSOLID, REGION and BODY entities, including AcDs payloads larger than 256 KiB. Small payloads stay inline within the AcDs data segment; larger ones use a blob reference and `blob01` segments. Each page carries up to `0xfffb0` payload bytes, so its segment and page headers fit within 1 MiB. Page records preserve total size, byte offsets, page order and handle lookup. The storage builder uses byte buffers rather than arrays of boxed numbers.
+
+To run the native blob regression after building:
+
+```sh
+node tools/check-dwg-oda-blobs.mjs "/path/to/ODAFileConverter"
+```
+
+The native check covers 14 generated R2013/R2018 drawings and four small-payload drawings for R14/R2000/R2004/R2010, retaining each solid, region and body handle and entity type. The large-payload cases cover the 256 KiB threshold, full pages, partial final pages and payloads spanning three pages. They use real legacy SAT geometry padded with whitespace to exercise storage boundaries without changing the geometry. Separate tests compare exact payload lengths and hashes, including binary data and mixed inline/blob records.
+
+The small-payload cases create new documents containing all three entity types. R2004 empty class tables now emit maximum class number 499, avoiding the invalid class count ODA inferred from zero.
+
+Set `ODA_FILE_CONVERTER` to the executable path when running tests to enable both optional ODA checks (build first).
