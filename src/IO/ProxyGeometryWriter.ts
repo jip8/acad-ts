@@ -13,13 +13,14 @@ class BinaryWriter {
 
 export class ProxyGeometryWriter {
 	static writeGeometries(geometries: Iterable<G.IProxyGeometry>): Uint8Array {
-		const chunks = [...geometries].map(geometry => this.writeGeometry(geometry));
+		const entries = [...geometries];
+		const chunks = entries.map(geometry => this.writeGeometry(geometry));
 		const result = new BinaryWriter();
 		result.int(8 + chunks.reduce((sum, data) => sum + data.length + 8, 0));
 		result.int(chunks.length);
 		for (let i = 0; i < chunks.length; i++) {
 			result.int(chunks[i].length + 8);
-			result.int([...geometries][i].graphicsType);
+			result.int(entries[i].graphicsType);
 			result.bytes(chunks[i]);
 		}
 		return result.result();
@@ -53,7 +54,11 @@ export class ProxyGeometryWriter {
 		} else if (geometry instanceof G.ProxyScalarGeometry) {
 			if (geometry.graphicsType === G.GraphicsType.SubentLineTypeScale || geometry.graphicsType === G.GraphicsType.SubentThickness) writer.double(geometry.value);
 			else { writer.int(geometry.value); if (geometry.secondaryValue !== undefined) writer.int(geometry.secondaryValue); }
-		} else throw new Error(`Unsupported proxy geometry ${geometry.graphicsType}`);
+		} else if (geometry instanceof G.ProxyModelTransform) {
+			for (let row = 0; row < 4; row++) for (let column = 0; column < 4; column++) writer.double(geometry.matrix.get(row, column));
+		} else if (![G.GraphicsType.PopClip, G.GraphicsType.PopModelTransform, G.GraphicsType.Unknown37].includes(geometry.graphicsType)) {
+			throw new Error(`Unsupported proxy geometry ${geometry.graphicsType}`);
+		}
 		return writer.result();
 	}
 }
