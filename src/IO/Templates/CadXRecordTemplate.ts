@@ -1,31 +1,29 @@
 import { CadObject } from '../../CadObject.js';
-import { XRecord } from '../../Objects/XRecrod.js';
+import { XRecord, XRecordEntry } from '../../Objects/XRecrod.js';
 import { NotificationType } from '../NotificationEventHandler.js';
 import { CadDocumentBuilder } from '../CadDocumentBuilder.js';
 import { CadTemplate } from './CadTemplate.js';
 
 export class CadXRecordTemplate extends CadTemplate<XRecord> {
-	private readonly _entries: [number, number][] = [];
+	private readonly _entries: XRecordEntry[] = [];
 
 	constructor(cadObject?: XRecord) {
 		super(cadObject ?? new XRecord());
 	}
 
 	addHandleReference(code: number, handle: number): void {
-		this._entries.push([code, handle]);
+		this._entries.push((this.cadObject as XRecord).createEntry(code, handle));
 	}
 
 	protected override _build(builder: CadDocumentBuilder): void {
 		super._build(builder);
-		const xrecord = this.cadObject as XRecord;
 
 		for (const entry of this._entries) {
-			const obj = builder.tryGetCadObject<CadObject>(entry[1]);
+			const obj = builder.tryGetCadObject<CadObject>(entry.value as number);
 			if (obj) {
-				xrecord.createEntry(entry[0], obj);
+				entry.value = obj;
 			} else {
-				xrecord.createEntry(entry[0], entry[1]);
-				builder.notify(`XRecord reference not found ${entry[0]}|${entry[1]}`, NotificationType.Warning);
+				builder.notify(`XRecord reference not found ${entry.code}|${entry.value}`, NotificationType.Warning);
 			}
 		}
 	}
