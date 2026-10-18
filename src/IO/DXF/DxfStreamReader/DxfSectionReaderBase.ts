@@ -1,4 +1,5 @@
 import { Entity } from '../../../Entities/Entity.js';
+import { ProxyEntity } from '../../../Entities/ProxyEntity.js';
 import { Arc } from '../../../Entities/Arc.js';
 import { AttributeEntity } from '../../../Entities/AttributeEntity.js';
 import { AttributeDefinition } from '../../../Entities/AttributeDefinition.js';
@@ -351,6 +352,8 @@ export abstract class DxfSectionReaderBase {
         return this.readEntityCodes(new CadSolid3DTemplate(), this._readSolid3d.bind(this), Solid3D);
       case DxfFileToken.entityRegion:
         return this.readEntityCodes(new CadEntityTemplate(new Region()), this._readModelerGeometry.bind(this), Region);
+      case DxfFileToken.entityProxyEntity:
+        return this.readEntityCodes(new CadEntityTemplate(new ProxyEntity()), this._readProxyEntity.bind(this), ProxyEntity);
       case DxfFileToken.entitySurface:
         return this.readEntityCodes(new CadEntityTemplate(new Surface()), this._readSurface.bind(this), Surface);
       case DxfFileToken.entityExtrudedSurface:
@@ -1566,6 +1569,37 @@ export abstract class DxfSectionReaderBase {
       default:
         return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(tmp.cadObject.subclassMarker)!);
     }
+  }
+
+  private _readProxyEntity(template: CadEntityTemplate, map: DxfMap): boolean {
+    const proxy = template.cadObject as ProxyEntity;
+    switch (this._reader.code) {
+      case 91:
+        proxy.dxfClass = [...this._builder.documentToBuild.classes].find(c => c.classNumber === this._reader.valueAsInt) ?? null;
+        return true;
+      case 160:
+        template.proxyGraphics = this._readProxyBytes(310);
+        return true;
+      case 161:
+      case 162:
+      case 94: return true;
+      default: return this.tryAssignCurrentValue(proxy, map.subClasses.get(DxfSubclassMarker.proxyEntity)!);
+    }
+  }
+
+  private _readProxyBytes(code: number): Uint8Array | null {
+    if (this._reader.valueAsInt === 0) return null;
+    const chunks: Uint8Array[] = [];
+    this._reader.readNext();
+    while (this._reader.code === code) {
+      chunks.push(this._reader.valueAsBinaryChunk);
+      this._reader.readNext();
+    }
+    this.lockPointer = true;
+    const result = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+    return result;
   }
 
   private _readOle2Frame(template: CadEntityTemplate, map: DxfMap, subclass?: string): boolean {

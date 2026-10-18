@@ -18,7 +18,7 @@ import { NotificationType } from '../NotificationEventHandler.js';
 import { ICadOwnerTemplate } from '../Templates/ICadOwnerTemplate.js';
 
 export class DxfDocumentBuilder extends CadDocumentBuilder {
-	public override get ignoreProxyGraphics(): boolean { return true; }
+	public override get ignoreProxyGraphics(): boolean { return this.configuration.ignoreProxyGraphics; }
   public configuration: DxfReaderConfiguration;
 
   public override get keepUnknownEntities(): boolean {
