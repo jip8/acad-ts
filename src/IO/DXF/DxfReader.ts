@@ -95,11 +95,15 @@ export class DxfReader extends CadReaderBase<DxfReaderConfiguration> {
     this._builder = new DxfDocumentBuilder(this._version, this._document, this.configuration);
     this._builder.onNotification = this.onNotificationEvent.bind(this);
     this._builder.onProgress = this.onProgressEvent.bind(this);
+	let orphanTablesReader: DxfTablesSectionReader | null = null;
 
     while (this._reader.valueAsString !== DxfFileToken.endOfFile) {
       if (this._reader.valueAsString === DxfFileToken.tableEntry) {
-        this.triggerNotification('Non-standard DXF: TABLE entry outside TABLES section. Attempting recovery.', NotificationType.Warning);
-        new DxfTablesSectionReader(this._reader, this._builder).readTable();
+        if (orphanTablesReader === null) {
+          this.triggerNotification('Non-standard DXF: TABLE entry outside TABLES section. Attempting recovery.', NotificationType.Warning);
+          orphanTablesReader = new DxfTablesSectionReader(this._reader, this._builder);
+        }
+        orphanTablesReader.readTable();
         this._reader.readNext();
         continue;
       }
