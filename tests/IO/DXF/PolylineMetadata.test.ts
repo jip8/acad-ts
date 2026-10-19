@@ -40,6 +40,24 @@ function expectSharedFields(polyline: Polyline, flags: number): void {
 }
 
 describe('old-style POLYLINE metadata', () => {
+  it('keeps SEQEND out of the vertex collection', () => {
+    const lines = [
+      '0', 'SECTION', '2', 'HEADER', '9', '$ACADVER', '1', 'AC1015', '0', 'ENDSEC',
+      '0', 'SECTION', '2', 'ENTITIES',
+      ...polylineEntity('10', 'AcDb3dPolyline', 8),
+      '0', 'VERTEX', '5', '11', '330', '10', '100', 'AcDbEntity', '8', '0',
+      '100', 'AcDbVertex', '100', 'AcDb3dPolylineVertex',
+      '10', '1', '20', '2', '30', '3', '70', '32',
+      '0', 'SEQEND', '5', '12', '330', '10', '100', 'AcDbEntity', '8', '0',
+      '0', 'ENDSEC', '0', 'EOF',
+    ];
+    const document = new DxfReader(new TextEncoder().encode(`${lines.join('\n')}\n`)).read();
+    const polyline = [...document.entities][0] as Polyline3D;
+    expect(polyline.vertices).toHaveLength(1);
+    expect(polyline.vertices.seqend.handle).toBe(0x12);
+    expect(polyline.vertices[0]).toMatchObject({ location: { x: 1, y: 2, z: 3 } });
+  });
+
   it('reads shared subclass fields for every polyline kind', () => {
     const lines = [
       '0', 'SECTION',

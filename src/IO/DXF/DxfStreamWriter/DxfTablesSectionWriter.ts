@@ -8,6 +8,7 @@ import { DxfCode } from '../../../DxfCode.js';
 import { DxfSubclassMarker } from '../../../DxfSubclassMarker.js';
 import { DxfClassMap } from '../../../DxfClassMap.js';
 import { DxfMap } from '../../../DxfMap.js';
+import { ACadVersion } from '../../../ACadVersion.js';
 import { TableEntry } from '../../../Tables/TableEntry.js';
 import { Table } from '../../../Tables/Collections/Table.js';
 import { AppId } from '../../../Tables/AppId.js';
@@ -49,7 +50,7 @@ export class DxfTablesSectionWriter extends DxfSectionWriterBase {
     this._writeTable(this._document.uCSs);
     this._writeTable(this._document.appIds);
     this._writeTable(this._document.dimensionStyles, DxfSubclassMarker.dimensionStyleTable);
-    this._writeTable(this._document.blockRecords, undefined, false);
+    if (this.version > ACadVersion.AC1009) this._writeTable(this._document.blockRecords, undefined, false);
   }
 
   private _writeTable<T extends TableEntry>(table: Table<T>, subclass?: string, writeFlags: boolean = true): void {

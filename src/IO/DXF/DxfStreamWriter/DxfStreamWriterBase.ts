@@ -13,6 +13,8 @@ import { LittleEndianConverter } from '../../Converters.js';
 
 export abstract class DxfStreamWriterBase implements IDxfStreamWriter {
   public writeOptional: boolean = false;
+  /** Use the group-code vocabulary available before R13. */
+  public legacyR12: boolean = false;
 
   public abstract close(): void;
 
@@ -26,6 +28,10 @@ export abstract class DxfStreamWriterBase implements IDxfStreamWriter {
     }
 
     const intCode = typeof code === 'number' ? code : code as number;
+    if (this.legacyR12 && intCode >= 80 && intCode < 999 &&
+      !(intCode >= 140 && intCode <= 149) &&
+      !(intCode >= 170 && intCode <= 179) &&
+      !(intCode >= 210 && intCode <= 239)) return;
 
     if (map && map.dxfProperties.has(intCode)) {
       const prop = map.dxfProperties.get(intCode)!;

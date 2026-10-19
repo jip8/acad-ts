@@ -3,6 +3,7 @@ import { DxfWriterConfiguration } from './DxfWriterConfiguration.js';
 import { IDxfStreamWriter } from './DxfStreamWriter/IDxfStreamWriter.js';
 import { DxfAsciiWriter } from './DxfStreamWriter/DxfAsciiWriter.js';
 import { DxfBinaryWriter } from './DxfStreamWriter/DxfBinaryWriter.js';
+import { DxfStreamWriterBase } from './DxfStreamWriter/DxfStreamWriterBase.js';
 import { DxfHeaderSectionWriter } from './DxfStreamWriter/DxfHeaderSectionWriter.js';
 import { DxfClassesSectionWriter } from './DxfStreamWriter/DxfClassesSectionWriter.js';
 import { DxfTablesSectionWriter } from './DxfStreamWriter/DxfTablesSectionWriter.js';
@@ -17,6 +18,10 @@ import { NotificationEventHandler } from '../NotificationEventHandler.js';
 import { encodeCadString } from '../TextEncoding.js';
 import { ACadVersion } from '../../ACadVersion.js';
 import { ModelerGeometry } from '../../Entities/ModelerGeometry.js';
+import { Insert } from '../../Entities/Insert.js';
+import { Polyline } from '../../Entities/Polyline.js';
+import { PolyfaceMesh } from '../../Entities/PolyfaceMesh.js';
+import { Seqend } from '../../Entities/Seqend.js';
 
 type DxfTextOutput = {
   write(value: string): void;
@@ -100,13 +105,32 @@ export class DxfWriter extends CadWriterBase<DxfWriterConfiguration, DxfWriteTar
   public override write(): void {
     super.write();
 
+    // Array-based child collections do not register newly constructed children
+    // automatically. Set owners and allocate handles before writing HANDSEED.
+    for (const block of this._document.blockRecords) {
+      for (const entity of block.entities) {
+        const children = entity instanceof Insert && entity.hasAttributes ? entity.attributes
+          : entity instanceof Polyline ? entity.vertices : null;
+        if (!children) continue;
+        for (const child of children) child.owner = entity;
+        this._document.registerCollection(children);
+        children.seqend ??= new Seqend();
+        children.seqend.owner = entity;
+        this._document.registerCollection(children.seqend);
+        if (entity instanceof PolyfaceMesh) {
+          for (const face of entity.faces) face.owner = entity;
+          this._document.registerCollection(entity.faces);
+        }
+      }
+    }
+
     this._createStreamWriter();
 
     this._objectHolder.objects.push(this._document.rootDictionary);
 
     this._writeHeader();
 
-    this._writeDxfClasses();
+    if (this._document.header.version > ACadVersion.AC1009) this._writeDxfClasses();
 
     this._writeTables();
 
@@ -114,7 +138,7 @@ export class DxfWriter extends CadWriterBase<DxfWriterConfiguration, DxfWriteTar
 
     this._writeEntities();
 
-    this._writeObjects();
+    if (this._document.header.version > ACadVersion.AC1009) this._writeObjects();
 
     this._writeACDSData();
 
@@ -159,6 +183,7 @@ export class DxfWriter extends CadWriterBase<DxfWriterConfiguration, DxfWriteTar
     }
 
     this._writer.writeOptional = this.configuration.writeOptionalValues;
+    (this._writer as DxfStreamWriterBase).legacyR12 = this._document.header.version <= ACadVersion.AC1009;
   }
 
   private _createTextTarget(): DxfTextOutput {

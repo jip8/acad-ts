@@ -30,13 +30,15 @@ export class DxfMap extends DxfMapBase {
 				break;
 			}
 
-			if (current.dxfSubClassName && current.dxfSubClassIsEmpty) {
+			if (current.dxfSubClassIsEmpty) {
 				const classMap = [...map.subClasses.values()].at(-1);
 				if (classMap) {
 					DxfMap.addClassProperties(classMap, current.typeName);
 				}
 
-				map.subClasses.set(current.dxfSubClassName, new DxfClassMap(current.dxfSubClassName));
+				if (current.dxfSubClassName) {
+					map.subClasses.set(current.dxfSubClassName, new DxfClassMap(current.dxfSubClassName));
+				}
 			} else if (current.dxfSubClassName) {
 				const classMap = new DxfClassMap(current.dxfSubClassName);
 				DxfMap.addClassProperties(classMap, current.typeName);

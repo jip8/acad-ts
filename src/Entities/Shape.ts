@@ -51,6 +51,9 @@ export class Shape extends Entity {
 	/** @internal */
 	shapeIndex: number = 0;
 
+	/** Shape name from DXF; resolving it to a DWG index requires the shape font. */
+	shapeName: string = '';
+
 	private _style!: TextStyle;
 
 	/** @internal */

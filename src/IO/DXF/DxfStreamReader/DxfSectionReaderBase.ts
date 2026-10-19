@@ -62,6 +62,7 @@ import { TextEntity } from '../../../Entities/TextEntity.js';
 import { TableEntity , CellContent, TableEntityRow, TableEntityColumn, CellType} from '../../../Entities/TableEntity.js';
 import { Tolerance } from '../../../Entities/Tolerance.js';
 import { Vertex2D } from '../../../Entities/Vertex2D.js';
+import { Vertex } from '../../../Entities/Vertex.js';
 import { Vertex3D } from '../../../Entities/Vertex3D.js';
 import { VertexFaceMesh } from '../../../Entities/VertexFaceMesh.js';
 import { VertexFaceRecord } from '../../../Entities/VertexFaceRecord.js';
@@ -312,7 +313,7 @@ export abstract class DxfSectionReaderBase {
       case DxfFileToken.entityHatch:
         return this.readEntityCodes(new CadHatchTemplate(), this.readHatch.bind(this), Hatch);
       case DxfFileToken.entityInsert:
-        return this.readEntityCodes(new CadInsertTemplate(), this._readInsert.bind(this), Insert);
+        return this._readInsertEntity();
       case DxfFileToken.entityMText:
         return this.readEntityCodes(new CadTextEntityTemplate(new MText()), this._readTextEntity.bind(this), MText);
       case DxfFileToken.entityMLine:
@@ -872,7 +873,7 @@ export abstract class DxfSectionReaderBase {
 
         if (tmp.cadObject instanceof DimensionPlaceholder && this._builder.version < ACadVersion.AC1012) {
           const placeholder = tmp.cadObject as DimensionPlaceholder;
-          switch (placeholder.flags) {
+          switch (placeholder.flags & 7) {
             case DimensionType.Linear:
               tmp.setDimensionObject(new DimensionLinear());
               map.subClasses.set(DxfSubclassMarker.alignedDimension, DxfClassMap.create(DimensionAligned));
@@ -1057,6 +1058,37 @@ export abstract class DxfSectionReaderBase {
     }
   }
 
+  private _readInsertEntity(): CadInsertTemplate {
+    const template = new CadInsertTemplate();
+    this.readEntityCodes(template, this._readInsert.bind(this), Insert);
+    if (!template.hasAtts) return template;
+    while (this._reader.code === 0 && this._reader.valueAsString === DxfFileToken.entityAttribute) {
+      const attribute = new CadAttributeTemplate(new AttributeEntity());
+      this.readEntityCodes(attribute, this._readAttributeDefinition.bind(this), AttributeEntity);
+      attribute.ownerHandle = template.cadObject.handle;
+      if (attribute.cadObject.handle === 0) {
+        attribute.cadObject.owner = template.cadObject;
+        (template.cadObject as Insert).attributes.push(attribute.cadObject as AttributeEntity);
+      } else {
+        template.ownedObjectsHandlers.add(attribute.cadObject.handle);
+        this._builder.addTemplate(attribute);
+      }
+    }
+    if (this._reader.code === 0 && this._reader.valueAsString === DxfFileToken.endSequence) {
+      const seqend = new CadEntityTemplate(new Seqend());
+      this.readEntityCodes(seqend, this._readEntitySubclassMap.bind(this), Seqend);
+      seqend.ownerHandle = template.cadObject.handle;
+      if (seqend.cadObject.handle === 0) {
+        seqend.cadObject.owner = template.cadObject;
+        (template.cadObject as Insert).attributes.seqend = seqend.cadObject as Seqend;
+      } else {
+        template.seqendHandle = seqend.cadObject.handle;
+        this._builder.addTemplate(seqend);
+      }
+    }
+    return template;
+  }
+
   private _readInsert(template: CadEntityTemplate, map: DxfMap, subclass?: string): boolean {
     const tmp = template as CadInsertTemplate;
 
@@ -1067,6 +1099,7 @@ export abstract class DxfSectionReaderBase {
       case 100:
         return true;
       case 66:
+        tmp.hasAtts = this._reader.valueAsInt !== 0;
         return true;
       default:
         return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(DxfSubclassMarker.insert)!);
@@ -1107,7 +1140,7 @@ export abstract class DxfSectionReaderBase {
         seqendTemplate.ownerHandle = template.cadObject.handle;
       }
 
-      template.ownedObjectsHandlers.add(seqendTemplate.cadObject.handle);
+      template.seqendHandle = seqendTemplate.cadObject.handle;
       this._builder.addTemplate(seqendTemplate);
     }
 
@@ -1115,18 +1148,26 @@ export abstract class DxfSectionReaderBase {
   }
 
   private _readLegacyPolyline(): CadEntityTemplate {
-    const polyline = new Polyline2D();
+    let polyline: Polyline2D | Polyline3D | PolygonMesh | PolyfaceMesh = new Polyline2D();
     const template = new CadPolyLineTemplate(polyline as unknown as IPolyline);
     this.readEntityCodes(template, this._readPolylineCodes.bind(this), Polyline2D);
+    polyline = template.cadObject as typeof polyline;
 
     while (this._reader.code === 0 && this._reader.valueAsString === DxfFileToken.entityVertex) {
-      const v = new Vertex2D();
+      let v: Vertex = polyline instanceof Polyline3D ? new Vertex3D()
+        : polyline instanceof PolygonMesh ? new PolygonMeshVertex()
+        : polyline instanceof PolyfaceMesh ? new VertexFaceRecord() : new Vertex2D();
       const vertexTemplate = new CadVertexTemplate(v);
-      this.readEntityCodes(vertexTemplate, this._readVertex.bind(this), Vertex2D);
+      this.readEntityCodes(vertexTemplate, this._readVertex.bind(this), v.constructor);
+      if (polyline instanceof PolyfaceMesh && (v.flags & 64) !== 0) {
+        v = Object.assign(new VertexFaceMesh(), v);
+        vertexTemplate.setVertexObject(v);
+      }
 
       if (vertexTemplate.vertex.handle === 0) {
         v.owner = polyline;
-        polyline.vertices.push(v);
+        if (polyline instanceof PolyfaceMesh && v instanceof VertexFaceRecord) polyline.faces.push(v);
+        else polyline.vertices.push(v);
       } else {
         template.ownedObjectsHandlers.add(vertexTemplate.vertex.handle);
         this._builder.addTemplate(vertexTemplate);
@@ -1149,6 +1190,19 @@ export abstract class DxfSectionReaderBase {
     const tmp = template as CadPolyLineTemplate;
 
     switch (this._reader.code as number) {
+      case 70:
+        if (this._builder.version === ACadVersion.AC1009 || this._builder.version === ACadVersion.Unknown) {
+          const flags = this._reader.valueAsInt;
+          const polyline = (flags & 64) !== 0 ? new PolyfaceMesh()
+            : (flags & 16) !== 0 ? new PolygonMesh()
+            : (flags & 8) !== 0 ? new Polyline3D() : new Polyline2D();
+          Object.assign(polyline, tmp.cadObject);
+          polyline.flags = flags;
+          tmp.setPolyLineObject(polyline);
+          map.subClasses.set(polyline.subclassMarker, DxfClassMap.create(polyline.constructor));
+          return true;
+        }
+        return this.tryAssignCurrentValue(template.cadObject, map.subClasses.get(tmp.cadObject.subclassMarker)!);
       case 10:
       case 20:
       case 66:
@@ -1531,6 +1585,7 @@ export abstract class DxfSectionReaderBase {
 
     switch (this._reader.code as number) {
       case 2:
+        (tmp.cadObject as Shape).shapeName = this._reader.valueAsString;
         tmp.shapeFileName = this._reader.valueAsString;
         return true;
       default:

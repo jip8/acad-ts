@@ -30,6 +30,11 @@ export class DxfBlocksSectionWriter extends DxfSectionWriterBase {
 
   protected writeSection(): void {
     for (const b of this._document.blockRecords) {
+      if (this.version <= ACadVersion.AC1009 &&
+        [BlockRecord.modelSpaceName.toUpperCase(), BlockRecord.paperSpaceName.toUpperCase()].includes(b.name.toUpperCase())) {
+        this._processEntities(b);
+        continue;
+      }
       this._writeBlock(b.blockEntity);
       this._processEntities(b);
       this._writeBlockEnd(b.blockEnd);

@@ -180,6 +180,10 @@ export abstract class DxfSectionWriterBase {
   }
 
   protected writeCommonObjectData(cadObject: CadObject): void {
+    if (this.version <= ACadVersion.AC1009) {
+      if (!(cadObject instanceof DimensionStyle)) this._writer.write(DxfCode.Handle, cadObject.handle);
+      return;
+    }
     if (cadObject instanceof DimensionStyle) {
       this._writer.write(DxfCode.DimVarHandle, cadObject.handle);
     } else {
@@ -265,7 +269,8 @@ export abstract class DxfSectionWriterBase {
       this._writer.writeTrueColor(420, entity.bookColor.color);
       this._writer.write(430, entity.bookColor.name);
     } else if (entity.color.isTrueColor) {
-      this._writer.writeTrueColor(420, entity.color);
+      if (this.version <= ACadVersion.AC1009) this._writer.write(62, entity.color.getApproxIndex());
+      else this._writer.writeTrueColor(420, entity.color);
     } else {
       this._writer.write(62, entity.color.index);
     }
@@ -309,6 +314,10 @@ export abstract class DxfSectionWriterBase {
   // =====================================================
 
   protected writeEntity(entity: Entity): void {
+    if (this.version <= ACadVersion.AC1009 && entity instanceof LwPolyline) {
+      this._writeR12LwPolyline(entity);
+      return;
+    }
     if (!this._isEntitySupported(entity)) {
       return;
     }
@@ -391,6 +400,8 @@ export abstract class DxfSectionWriterBase {
       this._writeSolid(entity, map);
     } else if (entity instanceof Spline) {
       this._writeSpline(entity, map);
+    } else if (entity instanceof AttributeBase) {
+      this._writeAttributeBase(entity, map);
     } else if (entity instanceof TextEntity) {
       this._writeTextEntity(entity, map);
     } else if (entity instanceof Tolerance) {
@@ -402,7 +413,7 @@ export abstract class DxfSectionWriterBase {
     } else if (entity instanceof RasterImage || entity instanceof Wipeout) {
       this._writeCadImage(entity as CadImage, map);
     } else if (entity instanceof Seqend) {
-      this._writeSeqend(entity, map);
+      // SEQEND has only the common data already written above.
     } else {
       this.notify(`Entity not implemented: ${entity.constructor.name}`, NotificationType.NotImplemented);
     }
@@ -411,11 +422,41 @@ export abstract class DxfSectionWriterBase {
   }
 
   private _isEntitySupported(entity: Entity): boolean {
+    if (this.version <= ACadVersion.AC1009 &&
+      !['LINE', 'CIRCLE', 'ARC', 'POINT', 'TEXT', 'ATTRIB', 'ATTDEF', 'INSERT',
+        'POLYLINE', 'VERTEX', 'SEQEND', '3DFACE', 'SOLID', 'TRACE', 'SHAPE', 'DIMENSION', 'VIEWPORT'].includes(entity.objectName)) {
+      this.notify(`Entity ${entity.objectName} is not supported by R12 DXF.`, NotificationType.NotImplemented);
+      return false;
+    }
     if (entity instanceof Surface) return false;
     if (entity instanceof UnknownEntity) {
       return false;
     }
     return true;
+  }
+
+  private _writeR12LwPolyline(polyline: LwPolyline): void {
+    this._writer.write(0, 'POLYLINE');
+    this.writeCommonObjectData(polyline);
+    this.writeCommonEntityData(polyline);
+    this._writer.write(66, 1);
+    this._writer.write(70, polyline.flags);
+    this._writer.writeVector(10, new XYZ(0, 0, polyline.elevation));
+    this._writer.write(39, polyline.thickness);
+    this._writer.writeVector(210, polyline.normal);
+    this.writeExtendedData(polyline.extendedData);
+    for (const vertex of polyline.vertices) {
+      this._writer.write(0, 'VERTEX');
+      this._writer.write(8, polyline.layer.name);
+      this._writer.writeVector(10, new XYZ(vertex.location.x, vertex.location.y, 0));
+      this._writer.write(70, 0);
+      this._writer.write(40, polyline.constantWidth || vertex.startWidth);
+      this._writer.write(41, polyline.constantWidth || vertex.endWidth);
+      this._writer.write(42, vertex.bulge);
+    }
+
+    this._writer.write(0, 'SEQEND');
+    this._writer.write(8, polyline.layer.name);
   }
 
   private _writeProxyEntity(proxy: ProxyEntity): void {
@@ -1070,7 +1111,21 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(DxfCode.Subclass, polyline.subclassMarker);
     this._writer.write(66, 1);
     this._writer.write(70, polyline.flags);
+    this._writer.writeVector(10, new XYZ(0, 0, polyline.elevation));
+    this._writer.write(39, polyline.thickness);
+    this._writer.write(40, polyline.startWidth);
+    this._writer.write(41, polyline.endWidth);
     this._writer.writeVector(210, polyline.normal);
+    if (polyline instanceof PolygonMesh) {
+      this._writer.write(71, polyline.mVertexCount);
+      this._writer.write(72, polyline.nVertexCount);
+      this._writer.write(73, polyline.mSmoothSurfaceDensity);
+      this._writer.write(74, polyline.nSmoothSurfaceDensity);
+      this._writer.write(75, polyline.smoothSurface);
+    } else if (polyline instanceof PolyfaceMesh) {
+      this._writer.write(71, polyline.vertices.length);
+      this._writer.write(72, polyline.faces.length);
+    }
 
     for (const vertex of polyline.vertices) {
       if (vertex instanceof Vertex) {
@@ -1078,6 +1133,9 @@ export abstract class DxfSectionWriterBase {
       }
     }
 
+    if (polyline instanceof PolyfaceMesh) {
+      for (const face of polyline.faces) this._writeVertex(face, map);
+    }
     this._writeSeqend(polyline.vertices.seqend, map);
   }
 
@@ -1116,7 +1174,7 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(DxfCode.Subclass, DxfSubclassMarker.shape);
     this._writer.writeVector(10, shape.insertionPoint, subclass);
     this._writer.write(40, shape.size, subclass);
-    this._writer.write(2, shape.shapeIndex, subclass);
+    this._writer.write(2, shape.shapeName || shape.shapeIndex, subclass);
     this._writer.write(50, shape.rotation, subclass);
     this._writer.write(41, shape.relativeXScale, subclass);
     this._writer.write(51, shape.obliqueAngle, subclass);
@@ -1222,7 +1280,7 @@ export abstract class DxfSectionWriterBase {
     this._writer.writeVector(210, text.normal, subclass);
 
     this._writer.write(DxfCode.Subclass, DxfSubclassMarker.text);
-    this._writer.write(73, text.verticalAlignment, subclass);
+    if (!(text instanceof AttributeBase)) this._writer.write(73, text.verticalAlignment, subclass);
   }
 
   private _writeTolerance(tolerance: Tolerance, map: DxfMap): void {
@@ -1304,20 +1362,13 @@ export abstract class DxfSectionWriterBase {
   }
 
   private _writeAttributeBase(att: AttributeBase, map: DxfMap): void {
+    this._writeTextEntity(att, map);
     this._writer.write(DxfCode.Subclass, att.subclassMarker);
     this._writer.write(2, att.tag);
+    if (att instanceof AttributeDefinition) this._writer.write(3, att.prompt);
     this._writer.write(70, att.flags);
-    this._writer.writeVector(10, att.insertPoint);
-    this._writer.write(40, att.height);
-    this._writer.write(1, att.value ?? '');
-    this._writer.write(7, att.style?.name ?? '');
-    this._writer.write(41, att.widthFactor);
-    this._writer.write(50, att.rotation);
-    this._writer.write(51, att.obliqueAngle);
-    this._writer.writeVector(11, att.alignmentPoint);
-    this._writer.write(71, att.mirror);
-    this._writer.write(72, att.horizontalAlignment);
-    this._writer.write(73, att.verticalAlignment);
-    this._writer.writeVector(210, att.normal);
+    this._writer.write(73, 0);
+    this._writer.write(74, att.verticalAlignment);
+    this._writer.write(280, att.isReallyLocked ? 1 : 0);
   }
 }

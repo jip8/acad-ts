@@ -45,6 +45,11 @@ export class DxfBinaryWriter extends DxfStreamWriterBase {
   }
 
   protected override writeDxfCode(code: number): void {
+    if (this.legacyR12) {
+      this._ensureCapacity(code < 255 ? 1 : 3);
+      this._buffer[this._position++] = code < 255 ? code : 255;
+      if (code < 255) return;
+    }
     this._ensureCapacity(2);
     this._writer.setInt16(this._position, code, true);
     this._position += 2;

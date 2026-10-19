@@ -379,11 +379,13 @@ export class DxfReader extends CadReaderBase<DxfReaderConfiguration> {
     const isBinary = DxfReader.isBinaryStream(stream);
     let isAC1009Format = false;
 
-    if (isBinary && stream.length > DxfBinaryReader.sentinelBytes.length) {
-      const flag = stream[DxfBinaryReader.sentinelBytes.length];
-      if (flag !== undefined && flag !== 0) {
-        isAC1009Format = true;
-      }
+    if (isBinary && stream.length > DxfBinaryReader.sentinelBytes.length + 1) {
+      const offset = DxfBinaryReader.sentinelBytes.length;
+      // Both formats normally begin with group 0 (SECTION). R12 stores one
+      // code byte, so the next byte is 'S'; R13+ stores the zero high byte.
+      // Comments use FF E7 03 in R12 and E7 03 in the modern encoding.
+      const first = stream[offset], second = stream[offset + 1];
+      isAC1009Format = first === 0xFF || (second !== 0 && !(first === 0xE7 && second === 0x03));
     }
 
     const tmpReader = this._createReader(isBinary, isAC1009Format);
