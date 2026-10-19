@@ -56,3 +56,25 @@ The native check covers 14 generated R2013/R2018 drawings and four small-payload
 The small-payload cases create new documents containing all three entity types. R2004 empty class tables now emit maximum class number 499, avoiding the invalid class count ODA inferred from zero.
 
 Set `ODA_FILE_CONVERTER` to the executable path when running tests to enable both optional ODA checks (build first).
+
+### R12 DXF and R13 DWG
+
+R12 ASCII/binary DXF writing and R13 DWG writing have a separate native check:
+
+```sh
+npm run build
+node tools/check-legacy-formats-oda.mjs "/path/to/ODAFileConverter"
+```
+
+With ODA File Converter 27.9.0.0 and audit enabled, all three outputs convert
+without error reports. The check verifies coordinates, circle radius, text,
+block content and references, and polyline elevation, closure and bulge after
+conversion. The R12 cases also check 3D polylines, polygon/polyface meshes,
+and INSERT attribute tags, values and definition prompts.
+The regular tests include an independently re-encoded R13 fixture, the
+five-record R13 file header and CRC, binary R12 code encoding, indexed-color
+downgrade, extended data and notification of unsupported modern entities.
+
+This coverage does not establish support for every entity in every old format.
+R12 DWG reading/writing and R2007 DWG writing remain unsupported. Older drawings
+can also contain newer custom classes whose data layouts are not decoded.

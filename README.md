@@ -22,8 +22,8 @@ Last compared upstream commit: https://github.com/DomCR/ACadSharp/commit/ed5ff1c
 
 |        | DxfReader | DxfWriter | DwgReader | DwgWriter |
 | ------ | :-------: | :-------: | :-------: | :-------: |
-| AC1009 | :heavy_check_mark: | :x: | :x: | :x: |
-| AC1012 | :heavy_check_mark: | :heavy_check_mark: | :x: | :x: |
+| AC1009 | :heavy_check_mark: | :heavy_check_mark: | :x: | :x: |
+| AC1012 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1014 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1015 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1018 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
@@ -35,6 +35,21 @@ Last compared upstream commit: https://github.com/DomCR/ACadSharp/commit/ed5ff1c
 R2007 (AC1021) DWG writing is unsupported and throws `CadNotSupportedException`.
 Earlier releases wrote an R2004 container with an R2007 signature, which external CAD engines reject.
 Choose AC1018 or AC1024 and later when exporting DWG. See [DWG interoperability validation](docs/dwg-interoperability.md).
+
+R11/R12 (AC1009) DXF writing supports ASCII and binary output, including legacy
+polylines, meshes, blocks and extended data. Lightweight polylines are exported
+as `POLYLINE`/`VERTEX` records and true colors are approximated with indexed
+colors. Entities introduced after R12 (such as MTEXT, HATCH and 3DSOLID) are
+omitted with a `NotImplemented` notification; they are not automatically exploded.
+R13 (AC1012) DWG reading and writing use the R13 container. Newer custom classes
+stored in old drawings still have the usual entity-specific limitations.
+These additions are checked with strict reader tests and an optional independent
+[ODA interoperability check](samples/legacy/README.md).
+
+The remaining version gaps are R11/R12 DWG reading and writing (a separate,
+pre-R13 format) and R2007 DWG writing (its own page layout, checksums and
+Reed–Solomon encoding). They remain unsupported until their codecs are
+implemented and independently validated.
 
 ## Installation
 
