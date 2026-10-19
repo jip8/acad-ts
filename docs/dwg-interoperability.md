@@ -2,9 +2,9 @@
 
 Issue [#11](https://github.com/node-projects/acad-ts/issues/11) reports ODA recovery failures that internal round trips did not detect.
 
-The regression coverage now checks legacy EED string bytes against the ODA specification (chapter 28), TABLESTYLE row and cell layouts, and full consumption of VisualStyle data from the original R2010–R2018 samples. The writer also emits typed references for table styles, evaluation expressions and image reactors, and queues evaluation expressions for writing.
+The regression coverage now checks legacy EED string bytes against the ODA specification (chapter 28), TABLESTYLE row and cell layouts, and full consumption of VisualStyle data from the original R2010â€“R2018 samples. The writer also emits typed references for table styles, evaluation expressions and image reactors, and queues evaluation expressions for writing.
 
-AC1021 (R2007) DWG output is unsupported. The previous implementation wrote an R2004 container with an R2007 signature; the reader's compatibility fallback hid that error during internal round trips. Writing now throws `CadNotSupportedException`. Reading R2007 DWG and reading/writing R2007 DXF remain supported. Choose AC1018 or AC1024 and later for DWG output.
+AC1021 (R2007) output now uses the native R2007 container: duplicated file headers and maps, normal and mirrored CRC64 checksums, and interleaved RS(255,239)/RS(255,251) protection. Uncompressed pages are emitted with equal compressed/uncompressed sizes. This avoids a runtime converter dependency, at the cost of larger files. The earlier R2004-container compatibility fallback is not used for this output.
 
 To verify with an installed ODA File Converter:
 
@@ -37,7 +37,7 @@ Run the expanded conversion check with:
 node tools/check-dwg-oda.mjs "/path/to/ODAFileConverter" --matrix
 ```
 
-The eight formerly failing AC1014/AC1015 upgrades to AC1027/AC1032 now store their modeler payloads in AcDs, with entity flags and a handle search index. Inline legacy ACIS flags are retained, and SAT whitespace is decoded correctly. Native R2013/R2018 AcDs records are read in payload-offset order, and the entity reader skips the absent inline prefix. ASM binary signatures and end markers are recognized when downgrading R2018 geometry. AC1021 output is excluded as described above.
+The eight formerly failing AC1014/AC1015 upgrades to AC1027/AC1032 now store their modeler payloads in AcDs, with entity flags and a handle search index. Inline legacy ACIS flags are retained, and SAT whitespace is decoded correctly. Native R2013/R2018 AcDs records are read in payload-offset order, and the entity reader skips the absent inline prefix. ASM binary signatures and end markers are recognized when downgrading R2018 geometry. That historical matrix excluded AC1021; the new R2007 checks are described below.
 
 ODA acceptance is not proof of complete content preservation. Regression tests compare modeler payload hashes for all six writable sample versions, legacy upgrades and R2018 downgrades, alongside original modern table content. The native check verifies all three baseline modeler handles in every rewritten drawing. Objects rejected by the reader or skipped by the writer can still be missing. The reporter's broader drawing collection, AEC/private objects, large-file performance and DXF entity omissions have not been validated here.
 
@@ -57,16 +57,16 @@ The small-payload cases create new documents containing all three entity types. 
 
 Set `ODA_FILE_CONVERTER` to the executable path when running tests to enable both optional ODA checks (build first).
 
-### R12 DXF and R13 DWG
+### R12, R13 and R2007
 
-R12 ASCII/binary DXF writing and R13 DWG writing have a separate native check:
+R12 ASCII/binary DXF and DWG, R13 DWG and R2007 DWG writing have a separate native check:
 
 ```sh
 npm run build
 node tools/check-legacy-formats-oda.mjs "/path/to/ODAFileConverter"
 ```
 
-With ODA File Converter 27.9.0.0 and audit enabled, all three outputs convert
+With ODA File Converter 27.9.0.0 and audit enabled, all five outputs convert
 without error reports. The check verifies coordinates, circle radius, text,
 block content and references, and polyline elevation, closure and bulge after
 conversion. The R12 cases also check 3D polylines, polygon/polyface meshes,
@@ -76,5 +76,11 @@ five-record R13 file header and CRC, binary R12 code encoding, indexed-color
 downgrade, extended data and notification of unsupported modern entities.
 
 This coverage does not establish support for every entity in every old format.
-R12 DWG reading/writing and R2007 DWG writing remain unsupported. Older drawings
-can also contain newer custom classes whose data layouts are not decoded.
+The R12 DWG codec covers the legacy primitives and sequences exercised here,
+plus layers, simple linetypes, text styles and application tables. New documents
+use an empty-drawing template for remaining header defaults. Loaded documents
+retain opaque header fields on rewrite; only common header settings are exposed.
+Dimension/view/UCS table customization, extended entity data and overflow
+records are not fully supported. Strict mode rejects unsupported entity types;
+the default recovery mode reports and skips them. Older drawings can also
+contain newer custom classes whose data layouts are not decoded.

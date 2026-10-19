@@ -88,11 +88,12 @@ function verify(doc, meshes) {
   }
 }
 
-for (const kind of ['r12-ascii', 'r12-binary', 'r13-dwg']) {
+for (const kind of ['r12-ascii', 'r12-binary', 'r12-dwg', 'r13-dwg', 'r2007-dwg']) {
   const input = path.join(run, `${kind}-input`), output = path.join(run, `${kind}-output`);
   mkdirSync(input); mkdirSync(output);
-  const dwg = kind === 'r13-dwg';
-  const doc = fixture(dwg ? ACadVersion.AC1012 : ACadVersion.AC1009);
+  const dwg = kind.endsWith('-dwg');
+  const doc = fixture(kind === 'r2007-dwg' ? ACadVersion.AC1021 : kind === 'r13-dwg' ? ACadVersion.AC1012 : ACadVersion.AC1009);
+  const meshes = doc.header.version === ACadVersion.AC1009;
   const name = `drawing.${dwg ? 'dwg' : 'dxf'}`;
   try {
     let bytes;
@@ -113,12 +114,41 @@ for (const kind of ['r12-ascii', 'r12-binary', 'r13-dwg']) {
     assert.equal(errors.length, 0, errors.map(f => readFileSync(path.join(output, f), 'utf8')).join('\n'));
     const converted = files.find(f => /^drawing\.dxf$/i.test(f));
     assert.ok(converted, 'ODA produced no DXF');
-    verify(DxfReader.readFromStream(readFileSync(path.join(output, converted))), !dwg);
+    verify(DxfReader.readFromStream(readFileSync(path.join(output, converted))), meshes);
     // R13 input must also be readable without failsafe recovery.
     if (dwg) {
       const reader = new DwgReader(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-      reader.configuration.failsafe = false; verify(reader.read());
+      reader.configuration.failsafe = false; verify(reader.read(), meshes);
     }
+    results.push({ kind, passed: true });
+  } catch (error) { results.push({ kind, passed: false, error: error.message }); }
+}
+
+// Exercise the R2007 object stream across page boundaries and its Unicode path.
+{
+  const kind = 'r2007-multipage-unicode';
+  const input = path.join(run, `${kind}-input`), output = path.join(run, `${kind}-output`);
+  mkdirSync(input); mkdirSync(output);
+  try {
+    const doc = new CadDocument(); doc.header.version = ACadVersion.AC1021;
+    doc.summaryInfo.title = 'Grüße 日本語';
+    const text = new TextEntity(); text.value = 'R2007 日本語 €'; doc.entities.add(text);
+    for (let i = 0; i < 2500; i++) doc.entities.add(new Line(new XYZ(i, 2, 3), new XYZ(i + 1, 5, 6)));
+    writeFileSync(path.join(input, 'drawing.dwg'), DwgWriter.writeToBuffer(doc));
+    const conversion = spawnSync(converter, [input, output, 'ACAD2018', 'DXF', '0', '1', '*.DWG'], {
+      encoding: 'utf8', timeout: 60000, windowsHide: true,
+    });
+    assert.ifError(conversion.error); assert.equal(conversion.status, 0);
+    const errors = readdirSync(output).filter(f => /\.err$/i.test(f));
+    assert.equal(errors.length, 0, errors.map(f => readFileSync(path.join(output, f), 'utf8')).join('\n'));
+    const convertedBytes = readFileSync(path.join(output, 'drawing.dxf'));
+    // ODA emits UTF-8 in R2018 DXF even when $DWGCODEPAGE says ANSI_1252.
+    // Check its actual text bytes independently of acad-ts's DXF decoder.
+    assert.ok(convertedBytes.includes(Buffer.from(text.value, 'utf8')), 'ODA lost Unicode text');
+    const converted = DxfReader.readFromStream(convertedBytes);
+    const entities = [...converted.entities]; assert.equal(entities.length, 2501);
+    const lines = entities.filter(e => e instanceof Line);
+    assert.deepEqual(lines[2499].endPoint, new XYZ(2500, 5, 6));
     results.push({ kind, passed: true });
   } catch (error) { results.push({ kind, passed: false, error: error.message }); }
 }

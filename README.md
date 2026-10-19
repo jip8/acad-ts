@@ -22,19 +22,19 @@ Last compared upstream commit: https://github.com/DomCR/ACadSharp/commit/ed5ff1c
 
 |        | DxfReader | DxfWriter | DwgReader | DwgWriter |
 | ------ | :-------: | :-------: | :-------: | :-------: |
-| AC1009 | :heavy_check_mark: | :heavy_check_mark: | :x: | :x: |
+| AC1009 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1012 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1014 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1015 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1018 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| AC1021 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :x: |
+| AC1021 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1024 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1027 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | AC1032 | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 
-R2007 (AC1021) DWG writing is unsupported and throws `CadNotSupportedException`.
-Earlier releases wrote an R2004 container with an R2007 signature, which external CAD engines reject.
-Choose AC1018 or AC1024 and later when exporting DWG. See [DWG interoperability validation](docs/dwg-interoperability.md).
+R2007 (AC1021) DWG writing uses its native page container, CRC64 checksums and
+Reed–Solomon protection. Pages are currently stored without LZ compression, so
+files can be larger than AutoCAD output. See [DWG interoperability validation](docs/dwg-interoperability.md).
 
 R11/R12 (AC1009) DXF writing supports ASCII and binary output, including legacy
 polylines, meshes, blocks and extended data. Lightweight polylines are exported
@@ -46,10 +46,14 @@ stored in old drawings still have the usual entity-specific limitations.
 These additions are checked with strict reader tests and an optional independent
 [ODA interoperability check](samples/legacy/README.md).
 
-The remaining version gaps are R11/R12 DWG reading and writing (a separate,
-pre-R13 format) and R2007 DWG writing (its own page layout, checksums and
-Reed–Solomon encoding). They remain unsupported until their codecs are
-implemented and independently validated.
+R11/R12 DWG uses a separate pre-R13 codec for lines, points, circles, arcs,
+text, solids/traces, faces, blocks, attributes, polylines and meshes. It preserves
+layer, simple linetype, text-style and application tables and common header
+settings. Other header bytes are retained when rewriting a loaded document;
+unsupported entity types are reported (or rejected with `failsafe = false`).
+Dimension/view/UCS table customization, extended entity data and overflow
+records are not fully supported. The version table describes file-format
+availability, not complete coverage of every AutoCAD object or property.
 
 ## Installation
 
