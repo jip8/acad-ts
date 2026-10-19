@@ -851,9 +851,9 @@ export class DwgObjectWriter extends DwgSectionIO {
 		this._writer.writeVariableText(viewport.name);
 		this._writeXrefDependantBit(viewport);
 		this._writer.writeBit(false);
-		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, 0);
-		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, 0);
 		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, viewport.blockRecord ?? 0);
+		this._writer.handleReferenceTyped(DwgReferenceType.SoftOwnership, 0);
+		this._writer.handleReferenceTyped(DwgReferenceType.HardPointer, 0);
 
 		this._registerObject(viewport);
 	}

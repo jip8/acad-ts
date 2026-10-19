@@ -878,7 +878,9 @@ export class DwgObjectReader extends DwgSectionIO {
       case DxfFileToken.objectAecCleanupGroupDef: template = this._readAecCleanupGroup(); break;
       case 'ACDBDICTIONARYWDFLT': template = this._readDictionaryWithDefault(); break;
       case 'ACDBPLACEHOLDER': template = this._readPlaceHolder(); break;
-      case 'ACAD_TABLE': template = this._readTableEntity(); break;
+      // Tables saved into older drawings are custom/proxy data, not the R2004+
+      // table layout. Preserve them through the unknown-class path below.
+      case 'ACAD_TABLE': if (this.r2004Plus) template = this._readTableEntity(); break;
 			case 'ACIDBLOCKREFERENCE': template = this._readInsert(); break;
       case DxfFileToken.objectDimensionAssociation: template = this._readDimensionAssociation(); break;
       case 'DBCOLOR': template = this._readDbColor(); break;
@@ -2065,9 +2067,9 @@ export class DwgObjectReader extends DwgSectionIO {
     viewport.name = this._textReader.readVariableText();
     this._readXrefDependantBit(template.cadObject);
     this._objectReader.readBit();
-    this._handleReference();
-    this._handleReference();
     template.blockHandle = this._handleReference();
+    this._handleReference();
+    this._handleReference();
     return template;
   }
 

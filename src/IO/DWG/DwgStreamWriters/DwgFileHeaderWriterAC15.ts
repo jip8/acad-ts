@@ -1,4 +1,5 @@
 import { CadDocument } from '../../../CadDocument.js';
+import { ACadVersion } from '../../../ACadVersion.js';
 import { DwgFileHeaderAC15 } from '../FileHeaders/DwgFileHeaderAC15.js';
 import { DwgSectionLocatorRecord } from '../FileHeaders/DwgSectionLocatorRecord.js';
 import { DwgSectionDefinition } from '../FileHeaders/DwgSectionDefinition.js';
@@ -8,11 +9,12 @@ import { IDwgStreamWriter } from './IDwgStreamWriter.js';
 import { DwgFileHeaderWriterBase } from './DwgFileHeaderWriterBase.js';
 
 export class DwgFileHeaderWriterAC15 extends DwgFileHeaderWriterBase<DwgFileHeaderAC15> {
-	override get fileHeaderSize(): number { return 0x61; }
+	private get isR13(): boolean { return this._document.header.version === ACadVersion.AC1012; }
+	override get fileHeaderSize(): number { return this.isR13 ? 0x58 : 0x61; }
 
 	override get handleSectionOffset(): number {
 		return this.fileHeaderSize
-			+ (this._records.get(DwgSectionDefinition.auxHeader)!.stream?.length ?? 0)
+			+ (this._records.get(DwgSectionDefinition.auxHeader)?.stream?.length ?? 0)
 			+ (this._records.get(DwgSectionDefinition.preview)!.stream?.length ?? 0)
 			+ (this._records.get(DwgSectionDefinition.header)!.stream?.length ?? 0)
 			+ (this._records.get(DwgSectionDefinition.classes)!.stream?.length ?? 0);
@@ -29,7 +31,7 @@ export class DwgFileHeaderWriterAC15 extends DwgFileHeaderWriterBase<DwgFileHead
 	constructor(stream: Uint8Array, encoding: string, document: CadDocument) {
 		super(stream, encoding, document, new DwgFileHeaderAC15());
 
-		this._records.set(DwgSectionDefinition.auxHeader, new DwgSectionLocatorRecord(5));
+		if (!this.isR13) this._records.set(DwgSectionDefinition.auxHeader, new DwgSectionLocatorRecord(5));
 		this._records.set(DwgSectionDefinition.preview, new DwgSectionLocatorRecord(null));
 		this._records.set(DwgSectionDefinition.header, new DwgSectionLocatorRecord(0));
 		this._records.set(DwgSectionDefinition.classes, new DwgSectionLocatorRecord(1));
@@ -40,6 +42,7 @@ export class DwgFileHeaderWriterAC15 extends DwgFileHeaderWriterBase<DwgFileHead
 	}
 
 	override addSection(name: string, stream: Uint8Array, isCompressed: boolean, decompsize: number = 29696): void {
+		if (this.isR13 && name === DwgSectionDefinition.auxHeader) return;
 		this._records.get(name)!.stream = stream;
 	}
 
@@ -84,24 +87,24 @@ export class DwgFileHeaderWriterAC15 extends DwgFileHeaderWriterBase<DwgFileHead
 		msWriter.writeBytes(versionBytes, 0, 6);
 
 		//The next 7 starting at offset 0x06
-		msWriter.writeBytes(new Uint8Array([0, 0, 0, 0, 0, 15, 1]));
+		msWriter.writeBytes(new Uint8Array([0, 0, 0, 0, 0, this.isR13 ? 0 : 15, 1]));
 
 		//At 0x0D is the preview seeker
 		msWriter.writeRawLong(this._records.get(DwgSectionDefinition.preview)!.seeker);
 
-		msWriter.writeByte(0x1B);
-		msWriter.writeByte(0x19);
+		msWriter.writeByte(this.isR13 ? 0 : 0x1B);
+		msWriter.writeByte(this.isR13 ? 0 : 0x19);
 
 		//Code page at 0x13
 		msWriter.writeRawShort(this.getFileCodePage());
-		msWriter.writeRawLong(DwgFileHeaderWriterAC15._nRecords);
+		msWriter.writeRawLong(this.isR13 ? 5 : DwgFileHeaderWriterAC15._nRecords);
 
 		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.header)!);
 		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.classes)!);
 		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.handles)!);
 		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.objFreeSpace)!);
 		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.template)!);
-		this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.auxHeader)!);
+		if (!this.isR13) this._writeRecord(msWriter, this._records.get(DwgSectionDefinition.auxHeader)!);
 
 		//Pad to align
 		const bitPad = (8 - (ms.length * 8) % 8) % 8;
@@ -111,7 +114,9 @@ export class DwgFileHeaderWriterAC15 extends DwgFileHeaderWriterBase<DwgFileHead
 
 		//CRC
 		const msArr = new Uint8Array(ms);
-		const crc = CRC8StreamHandler.getCRCValue(0xC0C1, msArr, 0, msArr.length);
+		const crc = this.isR13
+			? CRC8StreamHandler.getCRCValue(0, msArr, 0, msArr.length) ^ 0x3CC4
+			: CRC8StreamHandler.getCRCValue(0xC0C1, msArr, 0, msArr.length);
 		msWriter.writeRawShort(crc);
 
 		//End sentinel

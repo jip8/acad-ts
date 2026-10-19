@@ -34,8 +34,7 @@ const versions = [
 ];
 
 function isSupportedVersion(version: ACadVersion): boolean {
-  // AC1012 and below are not supported for writing
-  return version >= ACadVersion.AC1014 && version !== ACadVersion.AC1021;
+  return version >= ACadVersion.AC1012 && version !== ACadVersion.AC1021;
 }
 
 describe('DwgWriterTests', () => {
