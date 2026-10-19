@@ -973,7 +973,8 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 		this._reedSolomonDecoding(buffer, compressedData, factor, blockSize);
 
 		const decompressedData = new Uint8Array(uncompressedSize);
-		DwgLZ77AC21Decompressor.decompress(compressedData, 0, compressedSize, decompressedData);
+		if (compressedSize === uncompressedSize) decompressedData.set(compressedData.subarray(0, uncompressedSize));
+		else DwgLZ77AC21Decompressor.decompress(compressedData, 0, compressedSize, decompressedData);
 
 		return decompressedData;
 	}

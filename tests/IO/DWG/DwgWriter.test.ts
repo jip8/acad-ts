@@ -34,7 +34,7 @@ const versions = [
 ];
 
 function isSupportedVersion(version: ACadVersion): boolean {
-  return version >= ACadVersion.AC1012 && version !== ACadVersion.AC1021;
+  return version >= ACadVersion.AC1012;
 }
 
 describe('DwgWriterTests', () => {

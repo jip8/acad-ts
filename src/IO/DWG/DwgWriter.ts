@@ -13,6 +13,7 @@ import { DwgWriterConfiguration } from './DwgWriterConfiguration.js';
 import { IDwgFileHeaderWriter } from './DwgStreamWriters/IDwgFileHeaderWriter.js';
 import { DwgFileHeaderWriterAC15 } from './DwgStreamWriters/DwgFileHeaderWriterAC15.js';
 import { DwgFileHeaderWriterAC18 } from './DwgStreamWriters/DwgFileHeaderWriterAC18.js';
+import { DwgFileHeaderWriterAC21 } from './DwgStreamWriters/DwgFileHeaderWriterAC21.js';
 import { DwgHeaderWriter } from './DwgStreamWriters/DwgHeaderWriter.js';
 import { DwgClassesWriter } from './DwgStreamWriters/DwgClassesWriter.js';
 import { DwgObjectWriter } from './DwgStreamWriters/DwgObjectWriter.js';
@@ -133,9 +134,8 @@ export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 				this._fileHeaderWriter = new DwgFileHeaderWriterAC18(output, this._encoding, this._document);
 				break;
 			case ACadVersion.AC1021:
-				// R2007 requires its own container, including Reed-Solomon encoding.
-				// An AC18 container with an AC1021 signature is not a valid R2007 DWG.
-				throw new CadNotSupportedException(this._version);
+				this._fileHeaderWriter = new DwgFileHeaderWriterAC21(output, this._encoding, this._document);
+				break;
 			case ACadVersion.AC1024:
 			case ACadVersion.AC1027:
 			case ACadVersion.AC1032:
