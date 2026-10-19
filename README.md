@@ -57,6 +57,34 @@ implemented and independently validated.
 npm install @node-projects/acad-ts
 ```
 
+## Publishing a release
+
+The [release workflow](.github/workflows/release.yml) runs when a GitHub release
+is published. Use a SemVer release tag such as `v3.6.0` or `3.6.0` (without build
+metadata). The tag determines the npm package version; the release title is for
+display only. The workflow updates the version in its checkout without committing
+it back, runs tests, builds the library and minified bundle, and uploads the same
+`.tgz` package to the GitHub release and npm.
+
+Before the first release, configure an npm
+[trusted publisher](https://docs.npmjs.com/trusted-publishers/) for
+`@node-projects/acad-ts` in its npm package settings: choose GitHub Actions,
+owner `node-projects`, repository `acad-ts`, and workflow filename `release.yml`.
+Leave the environment name empty and allow publishing. No npm token secret is
+needed. If the package does not exist on npm yet, publish it once manually before
+configuring its trusted publisher.
+
+Alternatively, a maintainer with npm write access can configure it using the CLI:
+
+```bash
+npm trust github @node-projects/acad-ts --file release.yml --repository node-projects/acad-ts --allow-publish --yes
+```
+
+Publish a release from a commit containing the workflow. Stable versions use
+npm's `latest` dist-tag; GitHub prereleases and versions such as `v3.7.0-beta.1`
+use `next`. Draft releases do not trigger publishing. Each release must use a new
+npm version.
+
 ## Metadata-backed DXF mapping
 
 The original C# ACadSharp implementation relies on reflection and attributes such as `DxfCodeValue`, `DxfCollectionCodeValue`, `CadSystemVariable`, `DxfName`, and `DxfSubClass` to build DXF maps and header-variable tables at runtime. TypeScript does not have the same runtime reflection model, so acad-ts now uses a checked-in metadata lookup table instead.
