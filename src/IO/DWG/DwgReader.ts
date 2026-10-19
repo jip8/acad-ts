@@ -8,7 +8,7 @@ import { CadNotSupportedException } from '../../Exceptions/CadNotSupportedExcept
 import { CadHeader } from '../../Header/CadHeader.js';
 import { CadReaderBase } from '../CadReaderBase.js';
 import { HugeMemoryStream } from '../HugeMemoryStream.js';
-import { NotificationEventHandler, NotificationType } from '../NotificationEventHandler.js';
+import { NotificationEventHandler, NotificationEventArgs, NotificationType } from '../NotificationEventHandler.js';
 import { DwgFileHeader } from './FileHeaders/DwgFileHeader.js';
 import './FileHeaders/DwgFileHeaderFactory.js';
 import { DwgFileHeaderAC15 } from './FileHeaders/DwgFileHeaderAC15.js';
@@ -37,6 +37,7 @@ import { DwgAuxHeaderReader } from './DwgStreamReaders/DwgAuxHeaderReader.js';
 import { DwgPrototype1bReader } from './DwgStreamReaders/DwgPrototype1bReader.js';
 import { DwgLZ77AC18Decompressor } from './DwgStreamReaders/DwgLZ77AC18Decompressor.js';
 import { DwgLZ77AC21Decompressor } from './DwgStreamReaders/DwgLZ77AC21Decompressor.js';
+import { DwgR12Codec } from './DwgR12Codec.js';
 
 export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 	private _builder!: DwgDocumentBuilder;
@@ -65,6 +66,11 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 	}
 
 	read(): CadDocument {
+		if (String.fromCharCode(...this._fileBytes.subarray(0, 6)) === 'AC1009') {
+			this._document = new DwgR12Codec().read(this._fileBytes, !this.configuration.failsafe,
+				message => this.onNotification?.(this, new NotificationEventArgs(message, NotificationType.NotSupported)), this.configuration.crcCheck);
+			return this._document;
+		}
 		this._document = new CadDocument(undefined, false);
 
 		this._fileHeader = this.readFileHeader();
@@ -104,6 +110,7 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 	}
 
 	readPreview(): DwgPreview | null {
+		if (String.fromCharCode(...this._fileBytes.subarray(0, 6)) === 'AC1009') return null;
 		this._fileHeader = this._fileHeader ?? this.readFileHeader();
 
 		if (this._fileHeader.previewAddress < 0) return null;
@@ -119,6 +126,7 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 	}
 
 	readHeader(): CadHeader {
+		if (String.fromCharCode(...this._fileBytes.subarray(0, 6)) === 'AC1009') return this.read().header;
 		this._fileHeader = this._fileHeader ?? this.readFileHeader();
 
 		const header = new CadHeader();
@@ -143,6 +151,10 @@ export class DwgReader extends CadReaderBase<DwgReaderConfiguration> {
 		const versionStr = String.fromCharCode(...this._fileBytes.subarray(0, 6));
 		const version = CadUtils.getVersionFromName(versionStr);
 		const fileHeader = DwgFileHeader.createFileHeader(version)!;
+		if (version === ACadVersion.AC1009) {
+			fileHeader.acadMaintenanceVersion = this._fileBytes[11]; fileHeader.drawingCodePage = 30;
+			return fileHeader;
+		}
 
 		// Get the stream reader, positioned after the version string
 		const sreader = DwgStreamReaderBase.getStreamHandler(fileHeader.acadVersion, this._fileBytes);

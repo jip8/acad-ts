@@ -27,6 +27,7 @@ import './DwgStreamWriters/DwgStreamWriterFactory.js';
 import { DwgOutputBufferTooSmallError } from '../../Exceptions/DwgOutputBufferTooSmallError.js';
 import { ModelerGeometry } from '../../Entities/ModelerGeometry.js';
 import { DwgPrototype1bWriter } from './DwgStreamWriters/DwgPrototype1bWriter.js';
+import { DwgR12Codec } from './DwgR12Codec.js';
 
 export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 	preview: DwgPreview | null = null;
@@ -36,9 +37,10 @@ export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 	private _fileHeader!: DwgFileHeader;
 	private _fileHeaderWriter!: IDwgFileHeaderWriter;
 	private _handlesMap: Map<number, number> = new Map();
+	private _legacyBytesWritten = 0;
 
 	/** The actual number of bytes written to the output stream after Write() completes. */
-	get bytesWritten(): number { return this._fileHeaderWriter?.bytesWritten ?? 0; }
+	get bytesWritten(): number { return this._fileHeaderWriter?.bytesWritten ?? this._legacyBytesWritten; }
 
 	constructor(stream: ArrayBuffer | Uint8Array, document: CadDocument) {
 		super(stream, document);
@@ -51,6 +53,12 @@ export class DwgWriter extends CadWriterBase<DwgWriterConfiguration> {
 
 	override write(): void {
 		super.write();
+		if (this._version === ACadVersion.AC1009) {
+			const data = new DwgR12Codec(this._encoding).write(this._document, this.onNotification);
+			const output = this._stream instanceof Uint8Array ? this._stream : new Uint8Array(this._stream);
+			if (data.length > output.length) throw new DwgOutputBufferTooSmallError(data.length, output.length);
+			output.set(data); this._legacyBytesWritten = data.length; return;
+		}
 
 		if (this._version < ACadVersion.AC1018 && !this._document.vEntityControl) {
 			const viewportEntityControl = new ViewportEntityControl();
