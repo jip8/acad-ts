@@ -18,7 +18,6 @@ import { DxfFileToken } from '../../DxfFileToken.js';
 import { NotificationEventHandler } from '../NotificationEventHandler.js';
 import { encodeCadString } from '../TextEncoding.js';
 import { ACadVersion } from '../../ACadVersion.js';
-import { ModelerGeometry } from '../../Entities/ModelerGeometry.js';
 import { Insert } from '../../Entities/Insert.js';
 import { Polyline } from '../../Entities/Polyline.js';
 import { PolyfaceMesh } from '../../Entities/PolyfaceMesh.js';
@@ -247,16 +246,6 @@ export class DxfWriter extends CadWriterBase<DxfWriterConfiguration, DxfWriteTar
 
   private _writeACDSData(): void {
     if (this._document.header.version < ACadVersion.AC1027) {
-      return;
-    }
-
-    const records = new Map<number, ModelerGeometry>();
-    for (const geometry of this._objectHolder.modelerGeometries) {
-      if (geometry.acisData.length > 0) {
-        records.set(geometry.handle, geometry);
-      }
-    }
-    if (records.size === 0) {
       return;
     }
 

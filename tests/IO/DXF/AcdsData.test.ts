@@ -11,6 +11,25 @@ import { DxfAcdsDataSectionReader } from '../../../src/IO/DXF/DxfStreamReader/Dx
 import { DxfTextReader } from '../../../src/IO/DXF/DxfStreamReader/DxfTextReader.js';
 import { DxfDocumentBuilder } from '../../../src/IO/DXF/DxfDocumentBuilder.js';
 import { DxfReaderConfiguration } from '../../../src/IO/DXF/DxfReaderConfiguration.js';
+import { BlockRecord } from '../../../src/Tables/BlockRecord.js';
+
+it('omits empty geometries and uses the matching modeler schema for block-owned records', () => {
+  const document = new CadDocument(ACadVersion.AC1027);
+  expect(document.createDataStorage()).toBeNull();
+  document.entities.add(new Region());
+  expect(document.createDataStorage()).toBeNull();
+  const block = new BlockRecord('ACIS block');
+  const geometry = new Region();
+  geometry.acisData = new Uint8Array([1, 2, 3]);
+  block.entities.add(geometry);
+  document.blockRecords.add(block);
+  const storage = document.createDataStorage()!;
+  expect(storage.records).toHaveLength(1);
+  expect(storage.records[0].columns.get('AcDbDs::ID')?.handle).toBe(geometry.handle);
+  const schema = storage.schemes.find(schema => schema.index === storage.records[0].index)!;
+  expect(schema.name).toBe('AcDb3DSolid_ASM_Data');
+  expect(schema.properties.map(property => property.name)).toEqual(['AcDbDs::ID', 'ASM_Data']);
+});
 
 it('builds and round-trips all ACDS schema properties without confusing types and flags', () => {
   const document = new CadDocument(ACadVersion.AC1027);

@@ -107,7 +107,8 @@ export class CadDocument implements IHandledCadObject {
 
 	/** @internal Build storage from all registered geometries, including block contents. */
 	createDataStorage(): CadFileDataStorage | null {
-		const geometries = [...this._cadObjects.values()].filter((object): object is ModelerGeometry => object instanceof ModelerGeometry);
+		const geometries = [...this._cadObjects.values()].filter((object): object is ModelerGeometry =>
+			object instanceof ModelerGeometry && object.acisData.length > 0);
 		return geometries.length ? new CadFileDataStorage(geometries) : null;
 	}
 	private _rootDictionary: CadDictionary | null = null;
