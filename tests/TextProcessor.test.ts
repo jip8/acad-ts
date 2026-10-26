@@ -41,8 +41,20 @@ describe('TextProcessor', () => {
 		expect(plain('\\A1;\\H2.5x;\\pxqc;Top\\PBottom')).toBe('Top\nBottom');
 	});
 
-	it('StopsAtEndWhenTerminatorIsMissing', () => {
-		expect(plain('text\\W0.8')).toBe('text');
+	it.each(['A1', 'Q15', 'T1.1', 'W0.8', 'C18', 'c0', 'FTimes New Roman', 'fArial', 'H2.5x', 'h2', 'pxqc'])(
+		'StopsAtEndWhenTerminatorIsMissing: %s', (code) => {
+			expect(plain(`text\\${code}`)).toBe('text');
+		},
+	);
+
+	it('PreservesEscapedStackSeparatorsAndTerminators', () => {
+		expect(plain('\\S1\\/2;')).toBe('1/2');
+		expect(plain('\\S1\\#2;')).toBe('1#2');
+		expect(plain('\\S1\\;2^3; after')).toBe('1;2/3 after');
+	});
+
+	it('KeepsStackContentWhenTerminatorIsMissing', () => {
+		expect(plain('value \\S1^2')).toBe('value 1/2');
 	});
 
 	it('MTextPlainTextUsesProcessor', () => {

@@ -158,11 +158,7 @@ export class TextProcessor {
 	}
 
 	private static _processFont(text: string, start: number): number {
-		let end = text.indexOf(';', start);
-		end += 1;
-		// const data = text.substring(start, end).split('|');
-		// FontData would be: { name: data[0] }
-		return end;
+		return TextProcessor._jump(text, start);
 	}
 
 	private static _jump(text: string, start: number): number {
@@ -203,21 +199,15 @@ export class TextProcessor {
 	}
 
 	private static _processColor(text: string, start: number): number {
-		let end = text.indexOf(';', start);
-		end += 1;
-		return end;
+		return TextProcessor._jump(text, start);
 	}
 
 	private static _processHeight(text: string, start: number): number {
-		let end = text.indexOf(';', start);
-		end += 1;
-		return end;
+		return TextProcessor._jump(text, start);
 	}
 
 	private static _processJustification(text: string, start: number): number {
-		let end = text.indexOf(';', start);
-		end += 1;
-		return end;
+		return TextProcessor._jump(text, start);
 	}
 }
 
