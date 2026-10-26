@@ -8,6 +8,8 @@ import { XYZ } from '../Math/XYZ.js';
 
 export class Ole2Frame extends Entity {
 	binaryData: Uint8Array = new Uint8Array(0);
+	/** Embedded OLE payload, excluding the OLE2FRAME metadata header. */
+	oleData: Uint8Array = new Uint8Array(0);
 
 	isPaperSpace: boolean = false;
 

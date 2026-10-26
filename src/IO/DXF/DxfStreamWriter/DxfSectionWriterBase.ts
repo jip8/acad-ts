@@ -1078,7 +1078,7 @@ export abstract class DxfSectionWriterBase {
   private _writeOle2Frame(ole: Ole2Frame, map: DxfMap): void {
     const subclass = map.subClasses.get(DxfSubclassMarker.ole2Frame)!;
     this._writer.write(DxfCode.Subclass, DxfSubclassMarker.ole2Frame);
-    this._writer.write(70, ole.oleObjectType, subclass);
+    this._writer.write(70, ole.version, subclass);
     this._writer.write(3, ole.sourceApplication, subclass);
     this._writer.writeVector(10, ole.upperLeftCorner, subclass);
     this._writer.writeVector(11, ole.lowerRightCorner, subclass);

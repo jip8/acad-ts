@@ -2,6 +2,7 @@ import { Ole2Frame } from '../../Entities/Ole2Frame.js';
 import { XYZ } from '../../Math/XYZ.js';
 import { CadDocumentBuilder } from '../CadDocumentBuilder.js';
 import { CadEntityTemplateT } from './CadEntityTemplate.js';
+import { NotificationType } from '../NotificationEventHandler.js';
 
 export class CadOle2FrameTemplate extends CadEntityTemplateT<Ole2Frame> {
 	chunks: Uint8Array[] = [];
@@ -33,6 +34,16 @@ export class CadOle2FrameTemplate extends CadEntityTemplateT<Ole2Frame> {
 			// upper right
 			pos += 24;
 			this.cadObject.lowerRightCorner = this._read3Double(view, pos);
+			if (view.byteLength < 128) {
+				builder.notify(`Error reading OLE2 Frame data for handle ${this.cadObject.handle}`, NotificationType.Warning);
+				return;
+			}
+			const length = view.getInt32(124, true);
+			if (length < 0 || length > view.byteLength - 128) {
+				builder.notify(`Error reading OLE2 Frame data for handle ${this.cadObject.handle}`, NotificationType.Warning);
+				return;
+			}
+			this.cadObject.oleData = this.cadObject.binaryData.slice(128, 128 + length);
 		}
 	}
 
