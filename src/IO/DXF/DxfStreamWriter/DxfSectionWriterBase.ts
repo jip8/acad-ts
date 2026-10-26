@@ -1083,6 +1083,14 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(3, ole.sourceApplication, subclass);
     this._writer.writeVector(10, ole.upperLeftCorner, subclass);
     this._writer.writeVector(11, ole.lowerRightCorner, subclass);
+    this._writer.write(71, ole.oleObjectType);
+    this._writer.write(72, ole.isPaperSpace ? 1 : 0);
+    this._writer.write(73, 3);
+    this._writer.write(90, ole.binaryData.length);
+    for (let offset = 0; offset < ole.binaryData.length; offset += 127) {
+      this._writer.write(310, ole.binaryData.slice(offset, offset + 127));
+    }
+    this._writer.write(1, 'OLE');
   }
 
   private _writePdfUnderlay(underlay: PdfUnderlay, map: DxfMap): void {
