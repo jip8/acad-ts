@@ -285,7 +285,7 @@ export abstract class DxfSectionReaderBase {
       case DxfFileToken.entityArc:
         return this.readEntityCodes(new CadEntityTemplate(new Arc()), this._readArc.bind(this), Arc);
       case DxfFileToken.entityBody:
-        return this.readEntityCodes(new CadEntityTemplate(new CadBody()), this._readEntitySubclassMap.bind(this), CadBody);
+        return this.readEntityCodes(new CadEntityTemplate(new CadBody()), this._readModelerGeometry.bind(this), CadBody);
       case DxfFileToken.entityCircle:
         return this.readEntityCodes(new CadEntityTemplate(new Circle()), this._readCircle.bind(this), Circle);
       case DxfFileToken.entityArcDimension:

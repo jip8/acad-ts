@@ -12,6 +12,7 @@ import { Point } from '../../../src/Entities/Point.js';
 import { Arc } from '../../../src/Entities/Arc.js';
 import { TextEntity } from '../../../src/Entities/TextEntity.js';
 import { Region } from '../../../src/Entities/Region.js';
+import { CadBody } from '../../../src/Entities/CadBody.js';
 import { Solid3D } from '../../../src/Entities/Solid3D.js';
 import { Layer } from '../../../src/Tables/Layer.js';
 
@@ -136,10 +137,14 @@ describe('DxfWriterTests', () => {
     const doc = new CadDocument(ACadVersion.AC1027);
     const region = new Region();
     const solid = new Solid3D();
+    const body = new CadBody();
+    body.acisData = new TextEncoder().encode('ACIS BinaryFile body payload');
+    body.guid = '{01234567-89ab-cdef-0123-456789abcdef}';
     region.acisData = Uint8Array.from({ length: 300 }, (_, index) => index & 0xFF);
     solid.acisData = new TextEncoder().encode('ACIS BinaryFile solid payload');
     doc.entities.add(region);
     doc.entities.add(solid);
+    doc.entities.add(body);
 
     const stream = binary ? new InMemoryBinaryStream() : new InMemoryAsciiStream();
     new DxfWriter(stream as any, doc, binary).write();
@@ -150,6 +155,9 @@ describe('DxfWriterTests', () => {
 
     expect(rereadRegion?.acisData).toEqual(region.acisData);
     expect(rereadSolid?.acisData).toEqual(solid.acisData);
+    const rereadBody = [...reread.entities].find((entity): entity is CadBody => entity instanceof CadBody);
+    expect(rereadBody?.acisData).toEqual(body.acisData);
+    expect(rereadBody?.guid).toBe(body.guid);
   });
 
   it('round-trips inline SAT text in pre-R2013 DXF', () => {

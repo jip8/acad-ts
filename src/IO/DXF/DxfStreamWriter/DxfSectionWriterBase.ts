@@ -67,6 +67,7 @@ import { Surface } from '../../../Entities/Surface.js';
 import { ProxyEntity } from '../../../Entities/ProxyEntity.js';
 import { ProxyGeometryWriter } from '../../ProxyGeometryWriter.js';
 import { Region } from '../../../Entities/Region.js';
+import { CadBody } from '../../../Entities/CadBody.js';
 import { Solid3D } from '../../../Entities/Solid3D.js';
 import { AttributeBase } from '../../../Entities/AttributeBase.js';
 import { AttributeEntity } from '../../../Entities/AttributeEntity.js';
@@ -394,7 +395,7 @@ export abstract class DxfSectionWriterBase {
       this._writeShape(entity, map);
     } else if (entity instanceof ProxyEntity) {
       this._writeProxyEntity(entity);
-    } else if (entity instanceof Region || entity instanceof Solid3D) {
+    } else if (entity instanceof Region || entity instanceof Solid3D || entity instanceof CadBody) {
       this._writeModelerGeometry(entity);
     } else if (entity instanceof Solid) {
       this._writeSolid(entity, map);
@@ -1197,10 +1198,8 @@ export abstract class DxfSectionWriterBase {
     this._writer.write(DxfCode.Subclass, DxfSubclassMarker.modelerGeometry);
 
     if (this.version >= ACadVersion.AC1027) {
-      this._writer.write(290, 1);
-      if (geometry.guid) {
-        this._writer.write(2, geometry.guid);
-      }
+      this._writer.write(290, geometry.guid ? 1 : 0);
+      this._writer.write(2, geometry.guid || '{00000000-0000-0000-0000-000000000000}');
       this.holder.modelerGeometries.push(geometry);
     } else {
       this._writer.write(70, geometry.modelerFormatVersion || 1);
@@ -1223,8 +1222,9 @@ export abstract class DxfSectionWriterBase {
       }
     }
 
-    if (geometry instanceof Solid3D) {
+    if (geometry instanceof Solid3D && this.version >= ACadVersion.AC1021) {
       this._writer.write(DxfCode.Subclass, DxfSubclassMarker.solid3D);
+      this._writer.write(350, 0);
     }
   }
 
