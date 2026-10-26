@@ -423,6 +423,8 @@ export abstract class DxfSectionWriterBase {
   }
 
   private _isEntitySupported(entity: Entity): boolean {
+    if (this.version < ACadVersion.AC1014 &&
+      (entity instanceof CadBody || entity instanceof Region || entity instanceof Solid3D)) return false;
     if (this.version <= ACadVersion.AC1009 &&
       !['LINE', 'CIRCLE', 'ARC', 'POINT', 'TEXT', 'ATTRIB', 'ATTDEF', 'INSERT',
         'POLYLINE', 'VERTEX', 'SEQEND', '3DFACE', 'SOLID', 'TRACE', 'SHAPE', 'DIMENSION', 'VIEWPORT'].includes(entity.objectName)) {

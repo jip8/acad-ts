@@ -89,6 +89,17 @@ function containsByteSequence(data: Uint8Array, sequence: number[]): boolean {
 }
 
 describe('DxfWriterTests', () => {
+  it.each([ACadVersion.AC1012, ACadVersion.AC1014])('filters modeler entities by supported DXF version %s', version => {
+    const document = new CadDocument(version);
+    document.entities.add(new CadBody());
+    document.entities.add(new Region());
+    document.entities.add(new Solid3D());
+    const stream = new InMemoryAsciiStream();
+    DxfWriter.writeToStream(stream, document);
+    const entities = [...DxfReader.readFromStream(stream.toUint8Array()).entities];
+    expect(entities.filter(entity => entity instanceof CadBody || entity instanceof Region || entity instanceof Solid3D))
+      .toHaveLength(version < ACadVersion.AC1014 ? 0 : 3);
+  });
   it('can omit R2013+ ACIS storage without omitting its entity', () => {
     const doc = new CadDocument(ACadVersion.AC1027);
     const region = new Region();
