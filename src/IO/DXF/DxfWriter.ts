@@ -245,7 +245,7 @@ export class DxfWriter extends CadWriterBase<DxfWriterConfiguration, DxfWriteTar
   }
 
   private _writeACDSData(): void {
-    if (this._document.header.version < ACadVersion.AC1027) {
+    if (this._document.header.version < ACadVersion.AC1027 || !this.configuration.writeACISData) {
       return;
     }
 

@@ -89,6 +89,21 @@ function containsByteSequence(data: Uint8Array, sequence: number[]): boolean {
 }
 
 describe('DxfWriterTests', () => {
+  it('can omit R2013+ ACIS storage without omitting its entity', () => {
+    const doc = new CadDocument(ACadVersion.AC1027);
+    const region = new Region();
+    region.acisData = new TextEncoder().encode('ACIS BinaryFile payload');
+    doc.entities.add(region);
+    const configuration = new DxfWriterConfiguration();
+    expect(configuration.writeACISData).toBe(true);
+    configuration.writeACISData = false;
+    const stream = new InMemoryAsciiStream();
+    DxfWriter.writeToStream(stream, doc, false, configuration);
+    expect(new TextDecoder().decode(stream.toUint8Array())).not.toContain('ACDSDATA');
+    const reread = [...DxfReader.readFromStream(stream.toUint8Array()).entities].find(entity => entity instanceof Region) as Region;
+    expect(reread).toBeDefined();
+    expect(reread.acisData).toHaveLength(0);
+  });
   const doubleRoundTripCases: [number, number | null, number][] = [
     4.656612873077393e-10, -4.656612873077393e-10, 1.2345678901234568e-10,
     2.5e-20, 1.5e-30, 1.5e-40, 1.5e-100, 1.5e+30, 9.9e+30,
