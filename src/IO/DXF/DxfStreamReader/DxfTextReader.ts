@@ -39,10 +39,9 @@ export class DxfTextReader extends DxfStreamReaderBase {
       lineBytes = lineBytes.subarray(0, lineBytes.length - 1);
     }
 
-    let line = this.decodeString(lineBytes);
-
-    // Trim whitespace like C# StreamReader.ReadLine()
-    line = line.trim();
+    // ReadLine removes line endings, not spaces: SAT continuation chunks
+    // (and ordinary text values) may carry significant boundary whitespace.
+    const line = this.decodeString(lineBytes);
     this.valueRaw = line;
     return this.valueRaw;
   }

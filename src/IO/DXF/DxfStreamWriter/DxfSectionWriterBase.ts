@@ -1214,12 +1214,15 @@ export abstract class DxfSectionWriterBase {
       const acisText = geometry.getAcisText();
       if (acisText !== null) {
         for (const line of acisText.split(/\r?\n/)) {
-          let encoded = AcisTextCodec.decode(line) as string;
-          this._writer.write(1, encoded.substring(0, 250));
-          encoded = encoded.substring(250);
-          while (encoded.length > 0) {
-            this._writer.write(3, encoded.substring(0, 250));
-            encoded = encoded.substring(250);
+          const encoded = AcisTextCodec.decode(line.replace(/\r+$/, '')) as string;
+          for (let offset = 0; offset < encoded.length;) {
+            let length = Math.min(255, encoded.length - offset);
+            if (offset + length < encoded.length) {
+              const space = encoded.lastIndexOf(' ', offset + length - 1);
+              if (space > offset) length = space - offset + 1;
+            }
+            this._writer.write(offset === 0 ? 1 : 3, encoded.substring(offset, offset + length));
+            offset += length;
           }
         }
       } else if (geometry.acisData.length > 0) {
