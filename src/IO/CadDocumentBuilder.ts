@@ -103,7 +103,7 @@ export abstract class CadDocumentBuilder {
 		if (this.dataStorage === null) return;
 
 		for (const record of this.dataStorage.records) {
-			const idColumn = record.columns.get(CadFileDataStorage.id);
+			const idColumn = record.columns.get(CadFileDataStorage.acDbDsId);
 			const dataColumn = record.columns.get(CadFileDataStorage.asmData);
 			if (!idColumn || !dataColumn) continue;
 

@@ -65,7 +65,7 @@ export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 
 		if (directHandle && directChunks.length > 0) {
 			const idColumn = new AcdsRecordColumn();
-			idColumn.name = CadFileDataStorage.id;
+			idColumn.name = CadFileDataStorage.acDbDsId;
 			idColumn.handle = directHandle;
 			record.columns.set(idColumn.name, idColumn);
 

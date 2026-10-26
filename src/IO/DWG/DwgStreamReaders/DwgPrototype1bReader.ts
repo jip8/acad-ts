@@ -293,7 +293,7 @@ export class DwgPrototype1bReader extends DwgSectionIO {
 			const column = new AcdsRecordColumn();
 			column.name = property.name;
 			column.dataType = property.type;
-			if (property.name === CadFileDataStorage.id) column.handle = handle;
+			if (property.name === CadFileDataStorage.acDbDsId) column.handle = handle;
 			else if (property.name === CadFileDataStorage.asmData) column.data = data;
 			record.columns.set(column.name, column);
 		}
