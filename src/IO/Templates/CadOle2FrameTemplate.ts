@@ -24,8 +24,8 @@ export class CadOle2FrameTemplate extends CadEntityTemplateT<Ole2Frame> {
 			this.cadObject.binaryData = combined;
 		}
 
-		if (this.cadObject.binaryData && this.cadObject.binaryData.length > 0) {
-			const view = new DataView(this.cadObject.binaryData.buffer, this.cadObject.binaryData.byteOffset);
+		if (this.cadObject.binaryData && this.cadObject.binaryData.length >= 98) {
+			const view = new DataView(this.cadObject.binaryData.buffer, this.cadObject.binaryData.byteOffset, this.cadObject.binaryData.byteLength);
 			let pos = 2; // skip 2 unknown bytes
 
 			this.cadObject.upperLeftCorner = this._read3Double(view, pos);
