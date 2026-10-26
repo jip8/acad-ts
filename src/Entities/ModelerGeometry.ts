@@ -43,10 +43,28 @@ export abstract class ModelerGeometry extends Entity {
 	wires: ModelerGeometryWire[] = [];
 
 	/** @internal */
-	guid: string = '';
+	private _guid: string = '';
+	get guid(): string {
+		if (this._guid) return this._guid;
+		if (!(this.revisionMajor || this.revisionMinor1 || this.revisionMinor2 || this.revisionBytes.some(byte => byte !== 0))) return '';
+		const hex = (value: number, length: number) => (value >>> 0).toString(16).padStart(length, '0');
+		const tail = [...this.revisionBytes].map(byte => hex(byte, 2)).join('');
+		return `{${hex(this.revisionMajor, 8)}-${hex(this.revisionMinor1, 4)}-${hex(this.revisionMinor2, 4)}-${tail.slice(0, 4)}-${tail.slice(4)}}`;
+	}
+	set guid(value: string) {
+		this._guid = value;
+		const match = /^\{?([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})\}?$/i.exec(value);
+		if (!match) return;
+		this.revisionMajor = parseInt(match[1], 16);
+		this.revisionMinor1 = parseInt(match[2], 16);
+		this.revisionMinor2 = parseInt(match[3], 16);
+		const tail = match[4] + match[5];
+		this.revisionBytes = Uint8Array.from({ length: 8 }, (_, i) => parseInt(tail.slice(i * 2, i * 2 + 2), 16));
+	}
 	/** @internal */ acisTextEncoded: boolean | null = null;
 
-	modelerFormatVersion: number = 0;
+	modelerFormatVersion: number = 1;
+	get hasWireframeData(): boolean { return this.wires.length > 0 || this.silhouettes.length > 0; }
 	/** Undocumented bit preceding the inline ACIS version; retain it when rewriting. */
 	modelerDataFlag: boolean | null = null;
 	materialMappings: { arrayIndex: number; absoluteReference: number; materialHandle: number }[] = [];
