@@ -145,13 +145,14 @@ export class DxfAcdsDataSectionReader extends DxfSectionReaderBase {
 	private _readProperty(): AcdsSchemaProperty {
 		const property = new AcdsSchemaProperty();
 		property.name = this._reader.valueAsString;
+		this._reader.readNext();
 
-		while (this._reader.dxfCode !== DxfCode.Start && this._reader.dxfCode !== DxfCode.EmbeddedObjectStart) {
+		while (this._reader.dxfCode !== DxfCode.Start && this._reader.code !== 2 && this._reader.dxfCode !== DxfCode.EmbeddedObjectStart) {
 			switch (this._reader.code) {
-				case 91:
+				case 280:
 					property.type = this._reader.valueAsShort;
 					break;
-				case 280:
+				case 91:
 					property.propertyFlags = this._reader.valueAsShort as AcdsSchemaPropertyFlags;
 					break;
 			}

@@ -33,6 +33,8 @@ import { IObservableCadCollection } from './IObservableCadCollection.js';
 import { ISeqendCollection } from './ISeqendColleciton.js';
 
 import { DxfClassCollection } from './Classes/DxfClassCollection.js';
+import { CadFileDataStorage } from './DataStorage/CadFileDataStorage.js';
+import { ModelerGeometry } from './Entities/ModelerGeometry.js';
 
 type BlockMarkerOwner = { blockEntity: CadObject; blockEnd: CadObject };
 type EntityCollectionOwner = { entities: Iterable<CadObject> & IObservableCadCollection<CadObject> };
@@ -102,6 +104,12 @@ export class CadDocument implements IHandledCadObject {
 	vEntityControl: ViewportEntityControl | null = null;
 
 	private readonly _cadObjects: Map<number, IHandledCadObject> = new Map();
+
+	/** @internal Build storage from all registered geometries, including block contents. */
+	createDataStorage(): CadFileDataStorage | null {
+		const geometries = [...this._cadObjects.values()].filter((object): object is ModelerGeometry => object instanceof ModelerGeometry);
+		return geometries.length ? new CadFileDataStorage(geometries) : null;
+	}
 	private _rootDictionary: CadDictionary | null = null;
 
 	constructor();
