@@ -2645,7 +2645,7 @@ export class DwgObjectWriter extends DwgSectionIO {
 
 	private _writeSolid3D(solid: Solid3D): void {
 		this._writeModelerGeometry(solid);
-		if (this.r2007Plus) this._writer.handleReferenceTyped(DwgReferenceType.SoftPointer, null);
+		if (this.r2007Plus) this._writer.handleReferenceTyped(DwgReferenceType.HardOwnership, null);
 	}
 
 	private _writeTableEntity(table: TableEntity): void {

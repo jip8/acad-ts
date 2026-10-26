@@ -22,6 +22,7 @@ import { getDecoderEncodingLabel } from '../../../src/IO/TextEncoding.js';
 import { DwgOutputBufferTooSmallError } from '../../../src/Exceptions/DwgOutputBufferTooSmallError.js';
 import { XYZ } from '../../../src/Math/XYZ.js';
 import { Region } from '../../../src/Entities/Region.js';
+import { Solid3D } from '../../../src/Entities/Solid3D.js';
 
 const versions = [
   ACadVersion.AC1012,
@@ -39,6 +40,15 @@ function isSupportedVersion(version: ACadVersion): boolean {
 }
 
 describe('DwgWriterTests', () => {
+  it.each([ACadVersion.AC1021, ACadVersion.AC1027])('writes Solid3D geometry with a null history owner in %s', version => {
+    const doc = new CadDocument(version);
+    doc.entities.add(new Solid3D());
+    doc.entities.add(new Line(new XYZ(1, 2, 3), new XYZ(4, 5, 6)));
+    const output = DwgWriter.writeToBuffer(doc);
+    const reread = new DwgReader(output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength)).read();
+    expect([...reread.entities].some(entity => entity instanceof Solid3D)).toBe(true);
+    expect([...reread.entities].some(entity => entity instanceof Line && entity.startPoint.x === 1)).toBe(true);
+  });
   it('preserves a modeler revision GUID through R2013 DWG and clears an empty GUID', () => {
     const doc = new CadDocument(ACadVersion.AC1027);
     const geometry = new Region();
