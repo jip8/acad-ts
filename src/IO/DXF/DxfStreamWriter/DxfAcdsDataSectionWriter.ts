@@ -37,5 +37,22 @@ export class DxfAcdsDataSectionWriter extends DxfSectionWriterBase {
         this._writer.write(291, record.value291);
       }
     }
+    for (const record of this.storage.records) {
+      this._writer.write(0, DxfFileToken.acdsRecord);
+      this._writer.write(90, record.index);
+      for (const column of record.columns.values()) {
+        this._writer.write(2, column.name);
+        this._writer.write(280, column.dataType);
+        if (column.dataType === 10) {
+          this._writer.write(320, column.handle);
+        } else if (column.dataType === 15) {
+          const data = column.data ?? new Uint8Array();
+          this._writer.write(94, data.length);
+          for (let offset = 0; offset < data.length; offset += 127) {
+            this._writer.write(310, data.slice(offset, offset + 127));
+          }
+        }
+      }
+    }
   }
 }

@@ -14,7 +14,10 @@ import { DxfReaderConfiguration } from '../../../src/IO/DXF/DxfReaderConfigurati
 
 it('builds and round-trips all ACDS schema properties without confusing types and flags', () => {
   const document = new CadDocument(ACadVersion.AC1027);
-  const storage = new CadFileDataStorage([new Region()]);
+  const geometry = new Region();
+  geometry.handle = 42;
+  geometry.acisData = Uint8Array.from({ length: 300 }, (_, index) => index & 255);
+  const storage = new CadFileDataStorage([geometry]);
   const chunks: string[] = [];
   const writer = new DxfAsciiWriter({ write(value: string) { chunks.push(value); } });
   new DxfAcdsDataSectionWriter(storage, writer, document, new CadObjectHolder(), new DxfWriterConfiguration()).write();
@@ -24,6 +27,7 @@ it('builds and round-trips all ACDS schema properties without confusing types an
   const builder = new DxfDocumentBuilder(ACadVersion.AC1027, new CadDocument(), new DxfReaderConfiguration());
   new DxfAcdsDataSectionReader(reader, builder).read();
   expect(builder.dataStorage?.schemes).toEqual(storage.schemes);
+  expect(builder.dataStorage?.records).toEqual(storage.records);
   expect(storage.schemes[0].properties.map(property => [property.name, property.type, property.propertyFlags]))
     .toEqual([['AcDbDs::ID', 10, 8], ['Thumbnail_Data', 15, 0], ['AcDbDs::TreatedAsObjectData', 1, 1]]);
 });
