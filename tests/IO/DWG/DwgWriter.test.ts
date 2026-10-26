@@ -21,6 +21,7 @@ import { DxfFileToken } from '../../../src/DxfFileToken.js';
 import { getDecoderEncodingLabel } from '../../../src/IO/TextEncoding.js';
 import { DwgOutputBufferTooSmallError } from '../../../src/Exceptions/DwgOutputBufferTooSmallError.js';
 import { XYZ } from '../../../src/Math/XYZ.js';
+import { Region } from '../../../src/Entities/Region.js';
 
 const versions = [
   ACadVersion.AC1012,
@@ -38,6 +39,22 @@ function isSupportedVersion(version: ACadVersion): boolean {
 }
 
 describe('DwgWriterTests', () => {
+  it('preserves a modeler revision GUID through R2013 DWG and clears an empty GUID', () => {
+    const doc = new CadDocument(ACadVersion.AC1027);
+    const geometry = new Region();
+    geometry.guid = '{89abcdef-0123-4567-89ab-cdef01234567}';
+    expect(geometry.revisionGuidPresent).toBe(true);
+    doc.entities.add(geometry);
+    const output = DwgWriter.writeToBuffer(doc);
+    const reread = new DwgReader(output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength)).read();
+    const region = [...reread.entities].find(entity => entity instanceof Region) as Region;
+    expect(region.guid).toBe(geometry.guid);
+    expect(region.revisionGuidPresent).toBe(true);
+    region.guid = '';
+    expect(region.guid).toBe('');
+    expect(region.revisionMajor).toBe(0);
+    expect(region.revisionGuidPresent).toBe(false);
+  });
   it('ReturnsCompactAutomaticallySizedOutput', () => {
     const doc = new CadDocument();
     doc.header.version = ACadVersion.AC1032;

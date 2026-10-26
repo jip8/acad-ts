@@ -52,6 +52,7 @@ export abstract class ModelerGeometry extends Entity {
 		return `{${hex(this.revisionMajor, 8)}-${hex(this.revisionMinor1, 4)}-${hex(this.revisionMinor2, 4)}-${tail.slice(0, 4)}-${tail.slice(4)}}`;
 	}
 	set guid(value: string) {
+		if (!value) value = '{00000000-0000-0000-0000-000000000000}';
 		this._guid = value;
 		const match = /^\{?([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})\}?$/i.exec(value);
 		if (!match) return;
@@ -60,6 +61,8 @@ export abstract class ModelerGeometry extends Entity {
 		this.revisionMinor2 = parseInt(match[3], 16);
 		const tail = match[4] + match[5];
 		this.revisionBytes = Uint8Array.from({ length: 8 }, (_, i) => parseInt(tail.slice(i * 2, i * 2 + 2), 16));
+		this.revisionGuidPresent = !!(this.revisionMajor || this.revisionMinor1 || this.revisionMinor2 || this.revisionBytes.some(byte => byte !== 0));
+		if (!this.revisionGuidPresent) this._guid = '';
 	}
 	/** @internal */ acisTextEncoded: boolean | null = null;
 
