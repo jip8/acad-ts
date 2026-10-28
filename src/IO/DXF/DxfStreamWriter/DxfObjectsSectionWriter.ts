@@ -623,12 +623,13 @@ export class DxfObjectsSectionWriter extends DxfSectionWriterBase {
   }
 
   protected writeSection(): void {
-    while (this.holder.objects.length > 0) {
-      const item: CadObject = this.holder.objects.shift()!;
+    for (let index = 0; index < this.holder.objects.length; index++) {
+      const item: CadObject = this.holder.objects[index];
 	  if (this._writtenHandles.has(item.handle)) continue;
 	  this._writtenHandles.add(item.handle);
       this.writeObject(item);
     }
+    this.holder.objects.length = 0;
   }
 
   protected writeXRecord(record: XRecord): void {
